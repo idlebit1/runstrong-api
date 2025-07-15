@@ -75,7 +75,7 @@ git clone https://github.com/yourusername/runstrong-api.git .
 # Create production environment file
 cat > .env << EOF
 NODE_ENV=production
-***REMOVED***
+PORT=3000
 JWT_SECRET=your-secure-jwt-secret-here
 ANTHROPIC_API_KEY=your-anthropic-api-key
 VALID_API_KEYS=your-api-key-1,your-api-key-2

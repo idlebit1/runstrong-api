@@ -24,11 +24,11 @@ cp .env.example .env
 
 3. Configure environment variables:
 ```
-***REMOVED***
-***REMOVED***
+PORT=3000
+JWT_SECRET=your-jwt-secret-key-here
 ANTHROPIC_API_KEY=your-anthropic-api-key-here
 VALID_API_KEYS=api-key-1,api-key-2
-***REMOVED***
+NODE_ENV=development
 LOG_LEVEL=info
 ```
 
