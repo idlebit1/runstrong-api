@@ -219,6 +219,103 @@
             font-family: inherit;
             white-space: normal;
         }
+        .auth-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 80vh;
+        }
+        .auth-card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 30px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            border: none;
+            background: #f8f9fa;
+            cursor: pointer;
+            font-weight: 500;
+            color: #666;
+        }
+        .auth-tab:first-child {
+            border-radius: 6px 0 0 6px;
+        }
+        .auth-tab:last-child {
+            border-radius: 0 6px 6px 0;
+        }
+        .auth-tab.active {
+            background: #007AFF;
+            color: white;
+        }
+        .auth-form {
+            display: none;
+        }
+        .auth-form.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        .auth-button {
+            width: 100%;
+            padding: 12px;
+            background: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        .auth-button:hover {
+            background: #0056d3;
+        }
+        .auth-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .user-info {
+            margin-bottom: 20px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -227,11 +324,62 @@
         <p>Your pocket coach for whole-body running</p>
     </div>
 
-    <div class="container">
+    <!-- Authentication Screen -->
+    <div id="auth-screen" class="auth-container">
+        <div class="auth-card">
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-form="login">Login</button>
+                <button class="auth-tab" data-form="register">Register</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" class="auth-form active">
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                <button type="submit" class="auth-button">Login</button>
+                <div id="login-error" class="error" style="display: none;"></div>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="auth-form">
+                <div class="form-group">
+                    <label for="register-name">Name (optional)</label>
+                    <input type="text" id="register-name">
+                </div>
+                <div class="form-group">
+                    <label for="register-email">Email</label>
+                    <input type="email" id="register-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="register-password">Password</label>
+                    <input type="password" id="register-password" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label for="register-confirm">Confirm Password</label>
+                    <input type="password" id="register-confirm" required minlength="6">
+                </div>
+                <button type="submit" class="auth-button">Register</button>
+                <div id="register-error" class="error" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="main-app" class="container" style="display: none;">
         <div class="sidebar">
             <div class="user-info">
-                <label>User ID:</label>
-                <input type="text" id="userId" value="demo-user" style="width: 100%; margin-top: 5px;">
+                <div>
+                    <strong id="user-name">Loading...</strong>
+                    <br>
+                    <small id="user-email">Loading...</small>
+                </div>
+                <button id="logout-btn" class="logout-btn">Logout</button>
             </div>
 
             <div class="tabs">

@@ -1,5 +1,7 @@
-const API_BASE = `${window.location.protocol}//${window.location.host}/api/coach`;
-const API_KEY = 'test-key-123';
+const API_BASE = `${window.location.protocol}//${window.location.host}/api`;
+let authToken = localStorage.getItem('authToken');
+let refreshToken = localStorage.getItem('refreshToken');
+let currentUser = null;
 let currentConversationId = null;
 let currentFileId = null;
 let currentView = 'chat'; // 'chat' or 'file'
@@ -8,17 +10,58 @@ let currentView = 'chat'; // 'chat' or 'file'
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOMContentLoaded fired');
     
-    // Check if elements exist
-    const newConversationBtn = document.getElementById('newConversationBtn');
-    console.log('newConversationBtn found:', !!newConversationBtn);
-    
-    if (newConversationBtn) {
-        newConversationBtn.addEventListener('click', function() {
-            console.log('Button clicked!');
-            createNewConversation();
-        });
+    // Check authentication status
+    if (authToken) {
+        checkAuthAndInitialize();
+    } else {
+        showAuthScreen();
     }
     
+    setupAuthEventListeners();
+    setupMainAppEventListeners();
+});
+
+// Authentication functions
+function setupAuthEventListeners() {
+    // Auth tab switching
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            switchAuthTab(this.dataset.form);
+        });
+    });
+    
+    // Login form
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        await login(email, password);
+    });
+    
+    // Register form
+    document.getElementById('register-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const name = document.getElementById('register-name').value;
+        const email = document.getElementById('register-email').value;
+        const password = document.getElementById('register-password').value;
+        const confirm = document.getElementById('register-confirm').value;
+        
+        if (password !== confirm) {
+            showError('register-error', 'Passwords do not match');
+            return;
+        }
+        
+        await register(name, email, password);
+    });
+    
+    // Logout button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', logout);
+    }
+}
+
+function setupMainAppEventListeners() {
     // Add other event listeners
     const refreshBtn = document.getElementById('refreshBtn');
     if (refreshBtn) {
@@ -45,15 +88,243 @@ document.addEventListener('DOMContentLoaded', function() {
         backToChatBtn.addEventListener('click', showChatView);
     }
     
+    const newConversationBtn = document.getElementById('newConversationBtn');
+    if (newConversationBtn) {
+        newConversationBtn.addEventListener('click', function() {
+            console.log('Button clicked!');
+            createNewConversation();
+        });
+    }
+    
     // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', function() {
             switchTab(this.dataset.tab);
         });
     });
+}
+
+async function checkAuthAndInitialize() {
+    try {
+        const response = await apiCall(`${API_BASE}/auth/me`);
+        currentUser = response.user;
+        showMainApp();
+        refreshConversations();
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        logout();
+    }
+}
+
+function showAuthScreen() {
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('main-app').style.display = 'none';
+}
+
+function showMainApp() {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'flex';
     
-    refreshConversations();
-});
+    // Clear any previous user's UI state
+    clearAllUIState();
+    
+    if (currentUser) {
+        document.getElementById('user-name').textContent = currentUser.name || 'User';
+        document.getElementById('user-email').textContent = currentUser.email;
+    }
+}
+
+function switchAuthTab(formType) {
+    // Update tab buttons
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`[data-form="${formType}"]`).classList.add('active');
+    
+    // Update forms
+    document.querySelectorAll('.auth-form').forEach(form => {
+        form.classList.remove('active');
+    });
+    document.getElementById(`${formType}-form`).classList.add('active');
+    
+    // Clear errors
+    clearAuthErrors();
+}
+
+async function login(email, password) {
+    try {
+        const button = document.querySelector('#login-form .auth-button');
+        button.disabled = true;
+        button.textContent = 'Logging in...';
+        
+        clearAuthErrors();
+        
+        const response = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Login failed');
+        }
+        
+        // Store tokens and user data
+        authToken = data.token;
+        refreshToken = data.refreshToken;
+        currentUser = data.user;
+        
+        localStorage.setItem('authToken', authToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        
+        showMainApp();
+        refreshConversations();
+        
+    } catch (error) {
+        console.error('Login error:', error);
+        showError('login-error', error.message);
+    } finally {
+        const button = document.querySelector('#login-form .auth-button');
+        button.disabled = false;
+        button.textContent = 'Login';
+    }
+}
+
+async function register(name, email, password) {
+    try {
+        const button = document.querySelector('#register-form .auth-button');
+        button.disabled = true;
+        button.textContent = 'Creating account...';
+        
+        clearAuthErrors();
+        
+        const response = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name, email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Registration failed');
+        }
+        
+        // Store tokens and user data
+        authToken = data.token;
+        refreshToken = data.refreshToken;
+        currentUser = data.user;
+        
+        localStorage.setItem('authToken', authToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        
+        showMainApp();
+        refreshConversations();
+        
+    } catch (error) {
+        console.error('Register error:', error);
+        showError('register-error', error.message);
+    } finally {
+        const button = document.querySelector('#register-form .auth-button');
+        button.disabled = false;
+        button.textContent = 'Register';
+    }
+}
+
+function logout() {
+    authToken = null;
+    refreshToken = null;
+    currentUser = null;
+    currentConversationId = null;
+    currentFileId = null;
+    
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('refreshToken');
+    
+    // Clear all UI state
+    clearAllUIState();
+    
+    showAuthScreen();
+    
+    // Clear forms
+    document.querySelectorAll('input').forEach(input => {
+        if (input.type !== 'submit') input.value = '';
+    });
+    
+    clearAuthErrors();
+}
+
+function clearAllUIState() {
+    // Clear chat messages
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+        chatMessages.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <p>Welcome to RunStrong AI! 🏃‍♂️</p>
+                <p>Create a new conversation to start chatting with your AI running coach.</p>
+                <p>I can help you with training plans, running advice, and track your progress using the 7 pillars of RunStrong training.</p>
+            </div>
+        `;
+    }
+    
+    // Clear chat title and subtitle
+    const chatTitle = document.getElementById('chatTitle');
+    const chatSubtitle = document.getElementById('chatSubtitle');
+    if (chatTitle) chatTitle.textContent = 'Select a conversation';
+    if (chatSubtitle) chatSubtitle.textContent = 'Create a new conversation or select an existing one';
+    
+    // Clear conversations list
+    const conversationsList = document.getElementById('conversationsList');
+    if (conversationsList) {
+        conversationsList.innerHTML = '<div class="loading">Loading conversations...</div>';
+    }
+    
+    // Clear files list
+    const filesList = document.getElementById('filesList');
+    if (filesList) {
+        filesList.innerHTML = '<div class="loading">Loading files...</div>';
+    }
+    
+    // Clear file viewer
+    const fileContent = document.getElementById('fileContent');
+    const fileTitle = document.getElementById('fileTitle');
+    const fileSubtitle = document.getElementById('fileSubtitle');
+    if (fileContent) {
+        fileContent.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <p>📄 File Viewer</p>
+                <p>Select a training file from the sidebar to view its contents.</p>
+                <p>Files are automatically created by RunStrong AI as you chat about your training.</p>
+            </div>
+        `;
+    }
+    if (fileTitle) fileTitle.textContent = 'Select a file';
+    if (fileSubtitle) fileSubtitle.textContent = 'Choose a file from the sidebar to view its contents';
+    
+    // Reset to chat view
+    showChatView();
+    
+    // Clear message input
+    const messageInput = document.getElementById('messageInput');
+    if (messageInput) messageInput.value = '';
+}
+
+function showError(elementId, message) {
+    const errorElement = document.getElementById(elementId);
+    errorElement.textContent = message;
+    errorElement.style.display = 'block';
+}
+
+function clearAuthErrors() {
+    document.getElementById('login-error').style.display = 'none';
+    document.getElementById('register-error').style.display = 'none';
+}
 
 function handleKeyDown(event) {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -63,14 +334,47 @@ function handleKeyDown(event) {
 }
 
 async function apiCall(url, options = {}) {
+    if (!authToken && !url.includes('/auth/')) {
+        throw new Error('No authentication token available');
+    }
+    
+    const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers
+    };
+    
+    if (authToken && !url.includes('/auth/login') && !url.includes('/auth/register')) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    
     const response = await fetch(url, {
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `ApiKey ${API_KEY}`,
-            ...options.headers
-        },
+        headers,
         ...options
     });
+    
+    if (response.status === 401 && !url.includes('/auth/')) {
+        // Try to refresh token
+        if (refreshToken) {
+            try {
+                await refreshAuthToken();
+                // Retry original request
+                headers['Authorization'] = `Bearer ${authToken}`;
+                const retryResponse = await fetch(url, { headers, ...options });
+                if (!retryResponse.ok) {
+                    const error = await retryResponse.json();
+                    throw new Error(error.error || 'API call failed');
+                }
+                return retryResponse.json();
+            } catch (refreshError) {
+                console.error('Token refresh failed:', refreshError);
+                logout();
+                throw new Error('Authentication expired');
+            }
+        } else {
+            logout();
+            throw new Error('Authentication required');
+        }
+    }
     
     if (!response.ok) {
         const error = await response.json();
@@ -80,18 +384,36 @@ async function apiCall(url, options = {}) {
     return response.json();
 }
 
+async function refreshAuthToken() {
+    const response = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ refreshToken })
+    });
+    
+    if (!response.ok) {
+        throw new Error('Token refresh failed');
+    }
+    
+    const data = await response.json();
+    authToken = data.token;
+    refreshToken = data.refreshToken;
+    
+    localStorage.setItem('authToken', authToken);
+    localStorage.setItem('refreshToken', refreshToken);
+}
+
 async function createNewConversation() {
     console.log('createNewConversation called');
     try {
-        const userId = document.getElementById('userId').value;
-        console.log('User ID:', userId);
         console.log('API_BASE:', API_BASE);
         
-        const result = await apiCall(`${API_BASE}/conversations`, {
+        const result = await apiCall(`${API_BASE}/coach/conversations`, {
             method: 'POST',
             body: JSON.stringify({
-                title: 'New Training Session',
-                userId: userId
+                title: 'New Training Session'
             })
         });
         
@@ -112,8 +434,7 @@ async function createNewConversation() {
 
 async function refreshConversations() {
     try {
-        const userId = document.getElementById('userId').value;
-        const result = await apiCall(`${API_BASE}/conversations?userId=${userId}`);
+        const result = await apiCall(`${API_BASE}/coach/conversations`);
         
         const list = document.getElementById('conversationsList');
         if (result.conversations.length === 0) {
@@ -146,8 +467,7 @@ async function refreshConversations() {
 
 async function loadConversation(conversationId) {
     try {
-        const userId = document.getElementById('userId').value;
-        const result = await apiCall(`${API_BASE}/conversations/${conversationId}?userId=${userId}`);
+        const result = await apiCall(`${API_BASE}/coach/conversations/${conversationId}`);
         
         currentConversationId = conversationId;
         document.getElementById('chatTitle').textContent = result.title;
@@ -189,12 +509,10 @@ async function sendMessage() {
     messageInput.value = '';
     
     try {
-        const userId = document.getElementById('userId').value;
-        const result = await apiCall(`${API_BASE}/conversations/${currentConversationId}/messages`, {
+        const result = await apiCall(`${API_BASE}/coach/conversations/${currentConversationId}/messages`, {
             method: 'POST',
             body: JSON.stringify({
-                message: message,
-                userId: userId
+                message: message
             })
         });
         
@@ -276,8 +594,7 @@ function showFileView() {
 // File management functions
 async function refreshFiles() {
     try {
-        const userId = document.getElementById('userId').value;
-        const result = await apiCall(`${API_BASE}/files?userId=${userId}`);
+        const result = await apiCall(`${API_BASE}/coach/files`);
         
         const list = document.getElementById('filesList');
         if (result.files.length === 0) {
@@ -311,8 +628,7 @@ async function refreshFiles() {
 
 async function loadFile(fileId, fileName) {
     try {
-        const userId = document.getElementById('userId').value;
-        const result = await apiCall(`${API_BASE}/files/${fileName}?userId=${userId}`);
+        const result = await apiCall(`${API_BASE}/coach/files/${fileName}`);
         
         currentFileId = fileId;
         document.getElementById('fileTitle').textContent = fileName;

@@ -8,13 +8,13 @@ const router = express.Router();
 // Chat with the AI coach (legacy endpoint - creates new conversation each time)
 router.post('/chat', async (req, res) => {
   try {
-    const { message, userId } = req.body;
+    const { message } = req.body;
     
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
     
-    const userIdToUse = userId || req.user.id || 'anonymous';
+    const userIdToUse = req.user.userId;
     
     // Create a new conversation for this single exchange
     const newConv = await databaseConversationService.createConversation(userIdToUse);
@@ -62,13 +62,13 @@ router.post('/chat', async (req, res) => {
 router.post('/conversations/:conversationId/messages', async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const { message, userId } = req.body;
+    const { message } = req.body;
     
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
     
-    const userIdToUse = userId || req.user.id || 'anonymous';
+    const userIdToUse = req.user.userId;
     
     // Get existing conversation
     const conv = await databaseConversationService.getConversation(conversationId);
@@ -120,8 +120,8 @@ router.post('/conversations/:conversationId/messages', async (req, res) => {
 // Create a new conversation
 router.post('/conversations', async (req, res) => {
   try {
-    const { title, userId } = req.body;
-    const userIdToUse = userId || req.user.id || 'anonymous';
+    const { title } = req.body;
+    const userIdToUse = req.user.userId;
     
     const result = await databaseConversationService.createConversation(userIdToUse, title);
     
@@ -139,7 +139,7 @@ router.post('/conversations', async (req, res) => {
 // Get user's conversations
 router.get('/conversations', async (req, res) => {
   try {
-    const userId = req.query.userId || req.user.id || 'anonymous';
+    const userId = req.user.userId;
     const limit = parseInt(req.query.limit) || 50;
     
     const result = await databaseConversationService.getUserConversations(userId, limit);
@@ -159,7 +159,7 @@ router.get('/conversations', async (req, res) => {
 router.get('/conversations/:conversationId', async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const userId = req.query.userId || req.user.id || 'anonymous';
+    const userId = req.user.userId;
     
     const result = await databaseConversationService.getConversation(conversationId);
     
@@ -183,7 +183,7 @@ router.get('/conversations/:conversationId', async (req, res) => {
 router.delete('/conversations/:conversationId', async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const userId = req.query.userId || req.user.id || 'anonymous';
+    const userId = req.user.userId;
     
     const result = await databaseConversationService.deleteConversation(conversationId, userId);
     
@@ -202,8 +202,8 @@ router.delete('/conversations/:conversationId', async (req, res) => {
 router.put('/conversations/:conversationId/title', async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const { title, userId } = req.body;
-    const userIdToUse = userId || req.user.id || 'anonymous';
+    const { title } = req.body;
+    const userIdToUse = req.user.userId;
     
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
@@ -225,13 +225,13 @@ router.put('/conversations/:conversationId/title', async (req, res) => {
 // Generate a training plan
 router.post('/training-plan', async (req, res) => {
   try {
-    const { userProfile, goals, userId } = req.body;
+    const { userProfile, goals } = req.body;
     
     if (!userProfile || !goals) {
       return res.status(400).json({ error: 'User profile and goals are required' });
     }
     
-    const userIdToUse = userId || req.user.id || 'anonymous';
+    const userIdToUse = req.user.userId;
     
     const response = await anthropicService.generateTrainingPlan(userProfile, goals);
     
@@ -261,13 +261,13 @@ router.post('/training-plan', async (req, res) => {
 router.post('/files/:fileName', async (req, res) => {
   try {
     const { fileName } = req.params;
-    const { content, userId } = req.body;
+    const { content } = req.body;
     
     if (!content) {
       return res.status(400).json({ error: 'Content is required' });
     }
     
-    const userIdToUse = userId || req.user.id || 'anonymous';
+    const userIdToUse = req.user.userId;
     const result = await databaseFileService.writeFile(userIdToUse, fileName, content);
     
     if (!result.success) {
@@ -284,7 +284,7 @@ router.post('/files/:fileName', async (req, res) => {
 router.get('/files/:fileName', async (req, res) => {
   try {
     const { fileName } = req.params;
-    const userId = req.query.userId || req.user.id || 'anonymous';
+    const userId = req.user.userId;
     
     const result = await databaseFileService.readFile(userId, fileName);
     
@@ -301,7 +301,7 @@ router.get('/files/:fileName', async (req, res) => {
 
 router.get('/files', async (req, res) => {
   try {
-    const userId = req.query.userId || req.user.id || 'anonymous';
+    const userId = req.user.userId;
     const result = await databaseFileService.listFiles(userId);
     
     if (!result.success) {
@@ -318,7 +318,7 @@ router.get('/files', async (req, res) => {
 router.delete('/files/:fileName', async (req, res) => {
   try {
     const { fileName } = req.params;
-    const userId = req.query.userId || req.user.id || 'anonymous';
+    const userId = req.user.userId;
     
     const result = await databaseFileService.deleteFile(userId, fileName);
     

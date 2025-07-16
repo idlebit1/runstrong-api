@@ -3,13 +3,8 @@ const prisma = require('../lib/database');
 class DatabaseConversationService {
   async createConversation(userId, title = 'New Training Session') {
     try {
-      // Ensure user exists
-      await prisma.user.upsert({
-        where: { userId },
-        update: {},
-        create: { userId }
-      });
-
+      // No need to upsert user - user already exists from JWT authentication
+      
       const conversation = await prisma.conversation.create({
         data: {
           userId,

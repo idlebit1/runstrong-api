@@ -4,7 +4,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-const authMiddleware = require('./middleware/auth');
+const { authenticateJWT } = require('./middleware/jwtAuth');
+const authRoutes = require('./routes/auth');
 const coachRoutes = require('./routes/coach');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -35,7 +36,8 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
-app.use('/api/coach', authMiddleware, coachRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/coach', authenticateJWT, coachRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

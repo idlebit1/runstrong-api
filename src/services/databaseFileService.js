@@ -3,13 +3,8 @@ const prisma = require('../lib/database');
 class DatabaseFileService {
   async writeFile(userId, fileName, content) {
     try {
-      // Ensure user exists
-      await prisma.user.upsert({
-        where: { userId },
-        update: {},
-        create: { userId }
-      });
-
+      // No need to upsert user - user already exists from JWT authentication
+      
       // Determine file type based on extension
       const fileType = this._getFileType(fileName);
       
