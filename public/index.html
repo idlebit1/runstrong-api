@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RunStrong AI Coach - Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            height: 70vh;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-weight: 500;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab.active {
+            color: #007AFF;
+            border-bottom-color: #007AFF;
+        }
+        .tab:hover {
+            color: #007AFF;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .sidebar {
+            width: 300px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .chat-area {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .chat-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #fafafa;
+        }
+        .chat-input {
+            padding: 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 80%;
+        }
+        .message.user {
+            background: #007AFF;
+            color: white;
+            margin-left: auto;
+        }
+        .message.assistant {
+            background: white;
+            border: 1px solid #e0e0e0;
+        }
+        .conversation-item {
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .conversation-item:hover {
+            background-color: #f0f0f0;
+        }
+        .conversation-item.active {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .conversation-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .conversation-meta {
+            font-size: 12px;
+            color: #666;
+        }
+        input, textarea, button {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 8px 12px;
+        }
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover {
+            background: #0056d3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #messageInput {
+            flex: 1;
+            resize: none;
+            font-family: inherit;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .user-info {
+            margin-bottom: 20px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .new-conversation {
+            margin-bottom: 20px;
+        }
+        .error {
+            color: #d32f2f;
+            padding: 10px;
+            background: #ffebee;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .file-item {
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .file-item:hover {
+            background-color: #f0f0f0;
+        }
+        .file-item.active {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .file-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .file-meta {
+            font-size: 12px;
+            color: #666;
+        }
+        .file-viewer {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .file-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #fafafa;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        .file-content.markdown {
+            font-family: inherit;
+            white-space: normal;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏃‍♂️ RunStrong AI Coach</h1>
+        <p>Your pocket coach for whole-body running</p>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="user-info">
+                <label>User ID:</label>
+                <input type="text" id="userId" value="demo-user" style="width: 100%; margin-top: 5px;">
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" data-tab="conversations">Conversations</button>
+                <button class="tab" data-tab="files">Files</button>
+            </div>
+
+            <div class="tab-content active" id="conversations-tab">
+                <div class="new-conversation">
+                    <button id="newConversationBtn" style="width: 100%;">
+                        + New Conversation
+                    </button>
+                </div>
+
+                <div>
+                    <h3>Conversations</h3>
+                    <div id="conversationsList">
+                        <div class="loading">Loading conversations...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="files-tab">
+                <div style="margin-bottom: 20px;">
+                    <button id="refreshFilesBtn" style="width: 100%;">
+                        🔄 Refresh Files
+                    </button>
+                </div>
+
+                <div>
+                    <h3>Training Files</h3>
+                    <div id="filesList">
+                        <div class="loading">Loading files...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-area" id="chat-view">
+            <div class="chat-header">
+                <div>
+                    <h2 id="chatTitle">Select a conversation</h2>
+                    <small id="chatSubtitle">Create a new conversation or select an existing one</small>
+                </div>
+                <div>
+                    <button id="refreshBtn">Refresh</button>
+                </div>
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <div style="text-align: center; padding: 40px; color: #666;">
+                    <p>Welcome to RunStrong AI! 🏃‍♂️</p>
+                    <p>Create a new conversation to start chatting with your AI running coach.</p>
+                    <p>I can help you with training plans, running advice, and track your progress using the 7 pillars of RunStrong training.</p>
+                </div>
+            </div>
+
+            <div class="chat-input">
+                <textarea 
+                    id="messageInput" 
+                    placeholder="Type your message... (e.g., 'Hello', 'Create my plan for today', 'How was my last run?')"
+                    rows="2"
+                ></textarea>
+                <button id="sendButton">Send</button>
+            </div>
+        </div>
+
+        <div class="file-viewer" id="file-view" style="display: none;">
+            <div class="file-header">
+                <div>
+                    <h2 id="fileTitle">Select a file</h2>
+                    <small id="fileSubtitle">Choose a file from the sidebar to view its contents</small>
+                </div>
+                <div>
+                    <button id="backToChatBtn">← Back to Chat</button>
+                </div>
+            </div>
+
+            <div class="file-content" id="fileContent">
+                <div style="text-align: center; padding: 40px; color: #666;">
+                    <p>📄 File Viewer</p>
+                    <p>Select a training file from the sidebar to view its contents.</p>
+                    <p>Files are automatically created by RunStrong AI as you chat about your training.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=2"></script>
+</body>
+</html>

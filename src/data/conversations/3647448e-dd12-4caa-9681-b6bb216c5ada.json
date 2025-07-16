@@ -1,0 +1,23 @@
+{
+  "id": "3647448e-dd12-4caa-9681-b6bb216c5ada",
+  "userId": "debug-user",
+  "title": "Debug Test",
+  "messages": [
+    {
+      "id": "dea11ac3-9709-48be-875e-28cd21aa8b5d",
+      "role": "user",
+      "content": "Hello",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:43:59.104Z"
+    },
+    {
+      "id": "438bde70-dbee-453c-a880-fd5c9f34824e",
+      "role": "assistant",
+      "content": "Hello! I'm RunStrong AI, your running coach. I'm excited to help you reach your goals! \n\nIt looks like we're starting fresh - I don't have any files about your training yet. To get started, I'd love to learn about:\n\n- Your current running experience and fitness level\n- What goals you're working toward (race, distance, time, etc.)\n- Any injuries or areas you'd like to focus on\n- Your typical weekly schedule and availability\n\nWhat would you like to work on today?",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:44:07.540Z"
+    }
+  ],
+  "createdAt": "2025-07-16T03:43:47.178Z",
+  "updatedAt": "2025-07-16T03:44:07.540Z"
+}

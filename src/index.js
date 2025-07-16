@@ -11,8 +11,8 @@ const errorHandler = require('./middleware/errorHandler');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Security middleware
-app.use(helmet());
+// Security middleware - disabled for testing
+// app.use(helmet());
 app.use(cors());
 
 // Rate limiting
@@ -25,6 +25,9 @@ app.use(limiter);
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files for demo
+app.use(express.static('public'));
 
 // Health check endpoint
 app.get('/health', (req, res) => {

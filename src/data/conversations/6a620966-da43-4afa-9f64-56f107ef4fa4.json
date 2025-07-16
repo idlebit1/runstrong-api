@@ -1,0 +1,16 @@
+{
+  "id": "6a620966-da43-4afa-9f64-56f107ef4fa4",
+  "userId": "demo-user",
+  "title": "Test",
+  "messages": [
+    {
+      "id": "7ceb44ca-7c4a-4c18-9010-4cd9df18bcf7",
+      "role": "user",
+      "content": "Hello",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:38:32.710Z"
+    }
+  ],
+  "createdAt": "2025-07-16T03:38:32.698Z",
+  "updatedAt": "2025-07-16T03:38:32.710Z"
+}

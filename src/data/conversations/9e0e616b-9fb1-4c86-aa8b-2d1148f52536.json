@@ -1,0 +1,93 @@
+{
+  "id": "9e0e616b-9fb1-4c86-aa8b-2d1148f52536",
+  "userId": "demo-user",
+  "title": "New Training Session",
+  "messages": [
+    {
+      "id": "62190ab1-0a3d-461e-a07c-6fb8833eec41",
+      "role": "user",
+      "content": "Hello",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:44:38.132Z"
+    },
+    {
+      "id": "e577b3cc-8339-4587-aef5-5c9cc2d53b29",
+      "role": "assistant",
+      "content": "Hi! I'm RunStrong AI, your running coach. I'm excited to help you reach your goals! \n\nI don't see any existing files about your training yet, so let's start fresh. To create a personalized training plan for you, I'd love to learn more about:\n\n- Your current running experience and fitness level\n- What goals you're working toward (race distance, time goals, general fitness, etc.)\n- How many days per week you can train\n- Any injuries or limitations I should know about\n- What type of training you enjoy most\n\nWhat would you like to focus on first?",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:44:47.237Z"
+    },
+    {
+      "id": "1af6fdf2-264c-47ad-9c0a-20299e2cb8de",
+      "role": "user",
+      "content": "Moderate fitness. I'm working toward faster 5ks. I can train 6 days per week, but I am injury prone.",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:45:22.900Z"
+    },
+    {
+      "id": "14e20ea5-74c3-4c02-a799-64365f4069d5",
+      "role": "assistant",
+      "content": "Great! A 5K focus with 6 days per week is perfect for building speed while managing injury risk. Since you're injury-prone, we'll emphasize the **Foundation** pillar heavily - mobility, prehab, and recovery work.\n\nBefore I create your athlete profile and first training plan, a few quick questions:\n\n- What's your current 5K time (or recent pace you can hold for 20-30 minutes)?\n- What types of injuries have you dealt with before?\n- Do you have access to a gym, or prefer bodyweight/home workouts?\n- Any specific days you prefer for harder workouts vs. easier days?\n\nOnce I know this, I can create your athlete profile and today's training plan. We'll structure your week with 3-4 run days, 2 lift sessions, and daily foundation work to keep you healthy and progressing toward that faster 5K!",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:45:32.975Z"
+    },
+    {
+      "id": "169cc0f2-9a34-4598-a692-8a52d5b00a26",
+      "role": "user",
+      "content": "19:42",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:45:57.896Z"
+    },
+    {
+      "id": "c70aba16-20b9-4ab2-a997-31ef0166cbd8",
+      "role": "assistant",
+      "content": "Nice 5K time! Sub-20 with room to improve. Let me ask about those other details so I can create your profile and get you started:\n\n- What types of injuries have you dealt with before? (knees, IT band, plantar fasciitis, etc.)\n- Do you have access to a gym, or prefer bodyweight/home workouts?\n- Any specific days you prefer for harder workouts vs. easier days?\n\nWith a 19:42 5K, we'll be targeting workouts around 6:00-6:30 pace for speed work and 6:45-7:15 for tempo efforts, with easy runs much slower. The injury prevention focus will be key to consistent training!",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:46:06.089Z"
+    },
+    {
+      "id": "921d3376-b7e8-40cf-b234-111687019b75",
+      "role": "user",
+      "content": "All sorts of injuries. Main one is left hip pain due to weak glute, causing IT band pain. I also routinely get shin splints, plantar pain and achilles pain.",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:46:54.981Z"
+    },
+    {
+      "id": "399146aa-fc20-47e6-ae70-1dc0cfce27ac",
+      "role": "assistant",
+      "content": "Got it - that's a lot to manage, but very doable with the right approach! Your left hip/glute weakness is likely contributing to the downstream issues (IT band, shin splints). We'll make glute strengthening and hip stability a major focus.\n\nStill need to know:\n- Do you have access to a gym, or prefer bodyweight/home workouts?\n- Any specific days you prefer for harder workouts vs. easier days?\n\nWith your injury history, I'm thinking:\n- Daily foundation work (hip openers, glute activation, calf/achilles care)\n- 3-4 run days with careful progression\n- 2 targeted strength sessions focusing on glutes, hips, and lower leg stability\n- Extra emphasis on post-run recovery protocols\n\nOnce I know about gym access and your weekly schedule preferences, I can create your athlete profile and today's plan!",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:47:01.246Z"
+    },
+    {
+      "id": "806879d2-e4fb-4002-a0ec-5ab2ae2efbb4",
+      "role": "user",
+      "content": "I like to go to the gym once per week. Asside from that, I have some dumbells, a step, and a pullup/dip bar at home.",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:48:01.221Z"
+    },
+    {
+      "id": "ac857760-8003-4cda-9d7c-813992be0081",
+      "role": "assistant",
+      "content": "Perfect! One gym session plus home workouts with dumbbells, step, and pullup/dip bar gives us great options.\n\nLast question - any preference for which days you like harder workouts vs easier days? (Like do you prefer weekends for long runs, or midweek for speed work?)\n\nOnce I know this, I'll create your athlete profile and today's (July 16th) training plan. Given your injury history, we'll start conservatively with:\n\n- Daily foundation work targeting your trouble spots\n- 3-4 run days with careful volume progression  \n- 1 gym session + 1 home strength session per week\n- Lots of glute activation, hip stability, and lower leg care\n\nSound good?",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:48:06.759Z"
+    },
+    {
+      "id": "0c05f49e-cc45-4e5f-ac12-941769ae58f6",
+      "role": "user",
+      "content": "yes",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:48:13.250Z"
+    },
+    {
+      "id": "15a9ef42-9b93-4ba2-a426-514052aa0e82",
+      "role": "assistant",
+      "content": "Perfect! I've created your athlete profile and today's training plan. \n\n**Today's focus**: Easy 30-minute run with thorough pre/post-run foundation work targeting your glute weakness and injury-prone areas.\n\nKey points for today:\n- **Pre-run**: Glute activation is crucial - don't skip this!\n- **Run**: Keep it conversational (7:30-8:00/mile), stop if any pain develops\n- **Post-run**: Lower leg care for your shin/plantar/achilles issues\n\nThis is day 1, so I'm starting conservatively to see how your body responds. How does this plan look for today?",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:48:43.933Z"
+    }
+  ],
+  "createdAt": "2025-07-16T03:44:34.396Z",
+  "updatedAt": "2025-07-16T03:48:43.933Z"
+}

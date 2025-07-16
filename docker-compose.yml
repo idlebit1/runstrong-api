@@ -1,6 +1,21 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: runstrong_db
+      POSTGRES_USER: runstrong
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U runstrong -d runstrong_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   runstrong-api:
     build: .
     ports:
@@ -12,8 +27,10 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - VALID_API_KEYS=${VALID_API_KEYS}
       - LOG_LEVEL=info
-    volumes:
-      - ./data:/app/src/data
+      - DATABASE_URL=postgresql://runstrong:${DB_PASSWORD}@postgres:5432/runstrong_db
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
@@ -21,3 +38,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+volumes:
+  postgres_data:

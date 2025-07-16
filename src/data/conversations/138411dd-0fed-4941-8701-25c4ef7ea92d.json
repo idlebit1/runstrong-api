@@ -1,0 +1,16 @@
+{
+  "id": "138411dd-0fed-4941-8701-25c4ef7ea92d",
+  "userId": "demo-user",
+  "title": "New Training Session",
+  "messages": [
+    {
+      "id": "23fa2f7b-75f0-4d71-8d9c-b4dcab68d23b",
+      "role": "user",
+      "content": "Hello",
+      "toolUseResults": null,
+      "timestamp": "2025-07-16T03:37:58.515Z"
+    }
+  ],
+  "createdAt": "2025-07-16T03:37:54.130Z",
+  "updatedAt": "2025-07-16T03:37:58.515Z"
+}

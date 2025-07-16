@@ -1,10 +1,11 @@
 const express = require('express');
 const anthropicService = require('../services/anthropicService');
-const virtualFileSystem = require('../services/virtualFileSystem');
+const databaseConversationService = require('../services/databaseConversationService');
+const databaseFileService = require('../services/databaseFileService');
 
 const router = express.Router();
 
-// Chat with the AI coach
+// Chat with the AI coach (legacy endpoint - creates new conversation each time)
 router.post('/chat', async (req, res) => {
   try {
     const { message, userId } = req.body;
@@ -15,27 +16,208 @@ router.post('/chat', async (req, res) => {
     
     const userIdToUse = userId || req.user.id || 'anonymous';
     
+    // Create a new conversation for this single exchange
+    const newConv = await databaseConversationService.createConversation(userIdToUse);
+    if (!newConv.success) {
+      return res.status(500).json({ error: 'Failed to create conversation' });
+    }
+    
+    // Add user message
+    await databaseConversationService.addMessageToConversation(newConv.conversation.id, 'user', message);
+    
+    // Get conversation with messages
+    const conv = await databaseConversationService.getConversation(newConv.conversation.id);
+    const messages = conv.conversation.getMessages();
+    
     // Get user context from files
-    const userProfile = await virtualFileSystem.readFile(userIdToUse, 'profile.json');
-    const recentWorkouts = await virtualFileSystem.readFile(userIdToUse, 'recent_workouts.json');
+    const userProfile = await databaseFileService.readFile(userIdToUse, 'profile.json');
+    const recentWorkouts = await databaseFileService.readFile(userIdToUse, 'recent_workouts.json');
     
     const context = {
       userProfile: userProfile.success ? userProfile.content : null,
       recentWorkouts: recentWorkouts.success ? recentWorkouts.content : null
     };
     
-    const response = await anthropicService.generateCoachResponse(message, context);
+    const response = await anthropicService.generateCoachResponse(messages, context, userIdToUse);
     
     if (!response.success) {
       return res.status(500).json({ error: response.error });
     }
     
+    // Save assistant response
+    await databaseConversationService.addMessageToConversation(newConv.conversation.id, 'assistant', response.message);
+    
     res.json({
       response: response.message,
-      usage: response.usage
+      usage: response.usage,
+      conversationId: newConv.conversation.id
     });
   } catch (error) {
     console.error('Chat endpoint error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Chat within a specific conversation
+router.post('/conversations/:conversationId/messages', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { message, userId } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+    
+    const userIdToUse = userId || req.user.id || 'anonymous';
+    
+    // Get existing conversation
+    const conv = await databaseConversationService.getConversation(conversationId);
+    if (!conv.success) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    
+    // Verify user owns this conversation
+    if (conv.conversation.userId !== userIdToUse) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
+    // Add user message
+    await databaseConversationService.addMessageToConversation(conversationId, 'user', message);
+    
+    // Get updated conversation with all messages
+    const updatedConv = await databaseConversationService.getConversation(conversationId);
+    const messages = updatedConv.conversation.getMessages();
+    
+    // Get user context from files
+    const userProfile = await databaseFileService.readFile(userIdToUse, 'profile.json');
+    const recentWorkouts = await databaseFileService.readFile(userIdToUse, 'recent_workouts.json');
+    
+    const context = {
+      userProfile: userProfile.success ? userProfile.content : null,
+      recentWorkouts: recentWorkouts.success ? recentWorkouts.content : null
+    };
+    
+    const response = await anthropicService.generateCoachResponse(messages, context, userIdToUse);
+    
+    if (!response.success) {
+      return res.status(500).json({ error: response.error });
+    }
+    
+    // Save assistant response
+    await databaseConversationService.addMessageToConversation(conversationId, 'assistant', response.message);
+    
+    res.json({
+      response: response.message,
+      usage: response.usage,
+      conversationId
+    });
+  } catch (error) {
+    console.error('Conversation chat endpoint error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create a new conversation
+router.post('/conversations', async (req, res) => {
+  try {
+    const { title, userId } = req.body;
+    const userIdToUse = userId || req.user.id || 'anonymous';
+    
+    const result = await databaseConversationService.createConversation(userIdToUse, title);
+    
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
+    
+    res.json(result.conversation);
+  } catch (error) {
+    console.error('Create conversation endpoint error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get user's conversations
+router.get('/conversations', async (req, res) => {
+  try {
+    const userId = req.query.userId || req.user.id || 'anonymous';
+    const limit = parseInt(req.query.limit) || 50;
+    
+    const result = await databaseConversationService.getUserConversations(userId, limit);
+    
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
+    
+    res.json({ conversations: result.conversations });
+  } catch (error) {
+    console.error('Get conversations endpoint error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get a specific conversation with full history
+router.get('/conversations/:conversationId', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.query.userId || req.user.id || 'anonymous';
+    
+    const result = await databaseConversationService.getConversation(conversationId);
+    
+    if (!result.success) {
+      return res.status(404).json({ error: result.error });
+    }
+    
+    // Verify user owns this conversation
+    if (result.conversation.userId !== userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    
+    res.json(result.conversation.getFullHistory());
+  } catch (error) {
+    console.error('Get conversation endpoint error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete a conversation
+router.delete('/conversations/:conversationId', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.query.userId || req.user.id || 'anonymous';
+    
+    const result = await databaseConversationService.deleteConversation(conversationId, userId);
+    
+    if (!result.success) {
+      return res.status(404).json({ error: result.error });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete conversation endpoint error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update conversation title
+router.put('/conversations/:conversationId/title', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { title, userId } = req.body;
+    const userIdToUse = userId || req.user.id || 'anonymous';
+    
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    
+    const result = await databaseConversationService.updateConversationTitle(conversationId, userIdToUse, title);
+    
+    if (!result.success) {
+      return res.status(404).json({ error: result.error });
+    }
+    
+    res.json(result.conversation);
+  } catch (error) {
+    console.error('Update conversation title endpoint error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -57,8 +239,8 @@ router.post('/training-plan', async (req, res) => {
       return res.status(500).json({ error: response.error });
     }
     
-    // Save the training plan to the user's virtual filesystem
-    await virtualFileSystem.writeFile(userIdToUse, 'training_plan.json', {
+    // Save the training plan to the user's database files
+    await databaseFileService.writeFile(userIdToUse, 'training_plan.json', {
       plan: response.trainingPlan,
       userProfile,
       goals,
@@ -86,7 +268,7 @@ router.post('/files/:fileName', async (req, res) => {
     }
     
     const userIdToUse = userId || req.user.id || 'anonymous';
-    const result = await virtualFileSystem.writeFile(userIdToUse, fileName, content);
+    const result = await databaseFileService.writeFile(userIdToUse, fileName, content);
     
     if (!result.success) {
       return res.status(500).json({ error: result.error });
@@ -104,7 +286,7 @@ router.get('/files/:fileName', async (req, res) => {
     const { fileName } = req.params;
     const userId = req.query.userId || req.user.id || 'anonymous';
     
-    const result = await virtualFileSystem.readFile(userId, fileName);
+    const result = await databaseFileService.readFile(userId, fileName);
     
     if (!result.success) {
       return res.status(404).json({ error: result.error });
@@ -120,7 +302,7 @@ router.get('/files/:fileName', async (req, res) => {
 router.get('/files', async (req, res) => {
   try {
     const userId = req.query.userId || req.user.id || 'anonymous';
-    const result = await virtualFileSystem.listFiles(userId);
+    const result = await databaseFileService.listFiles(userId);
     
     if (!result.success) {
       return res.status(500).json({ error: result.error });
@@ -138,7 +320,7 @@ router.delete('/files/:fileName', async (req, res) => {
     const { fileName } = req.params;
     const userId = req.query.userId || req.user.id || 'anonymous';
     
-    const result = await virtualFileSystem.deleteFile(userId, fileName);
+    const result = await databaseFileService.deleteFile(userId, fileName);
     
     if (!result.success) {
       return res.status(404).json({ error: result.error });

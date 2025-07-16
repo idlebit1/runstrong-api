@@ -3,17 +3,22 @@ FROM node:18-alpine
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Install dependencies needed for Prisma
+RUN apk add --no-cache openssl
+
+# Copy package files and prisma schema
 COPY package*.json ./
+COPY prisma ./prisma/
 
 # Install dependencies
 RUN npm ci --only=production
 
-# Copy source code
-COPY src/ ./src/
+# Generate Prisma client
+RUN npx prisma generate
 
-# Create data directory for file storage
-RUN mkdir -p /app/src/data/userFiles
+# Copy source code and other files
+COPY src/ ./src/
+COPY public/ ./public/
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
@@ -32,5 +37,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Start the application
-CMD ["npm", "start"]
+# Start the application with database migration
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]

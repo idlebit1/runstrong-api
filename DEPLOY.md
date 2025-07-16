@@ -70,7 +70,29 @@ cd /opt/runstrong-api
 ### 3. Deploy Application
 ```bash
 # Clone your repository
-git clone https://github.com/yourusername/runstrong-api.git .
+# git clone https://github.com/yourusername/runstrong-api.git .
+
+Option 1: Use Personal Access Token
+# Generate a token at https://github.com/settings/tokens
+# Then clone with:
+git clone https://idlebit1:<your-token>@github.com/idlebit1/runstrong-api.git .
+
+Option 2: Use SSH (recommended)
+# Generate SSH key on droplet
+ssh-keygen -t ed25519 -C "your-email@example.com"
+
+# Copy public key and add to GitHub
+cat ~/.ssh/id_ed25519.pub
+
+# Clone with SSH
+git clone git@github.com:idlebit1/runstrong-api.git .
+
+Option 3: Clone from local machine and transfer
+# On your local machine
+scp -r /Users/reschkek/code/runstrong-api root@your-droplet-ip:/opt/runstrong-api
+
+Option 3 is fastest since you already have the code locally.
+
 
 # Create production environment file
 cat > .env << EOF
