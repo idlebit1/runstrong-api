@@ -335,10 +335,13 @@
         
         /* Training day interactive styles */
         .training-item {
-            display: flex;
-            align-items: flex-start;
             padding: 8px 0;
             border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .item-row {
+            display: flex;
+            align-items: flex-start;
             gap: 8px;
         }
         
@@ -372,14 +375,14 @@
             background-color: #e3f2fd;
         }
         
-        .item-note {
-            color: #666;
-            font-style: italic;
-            font-size: 0.9em;
-        }
         
         .training-item.checked .item-text {
             opacity: 0.7;
+        }
+        
+        .training-item.skipped .item-text {
+            text-decoration: line-through;
+            opacity: 0.6;
         }
         
         .add-item-section {
@@ -469,6 +472,38 @@
         
         .item-action-menu button:last-child {
             border-radius: 0 0 6px 6px;
+        }
+        
+        .item-action-menu button:hover {
+            background-color: #f5f5f5;
+        }
+        
+        /* Add note prompt styling */
+        .add-note-prompt {
+            margin-top: 8px;
+            margin-left: 24px;
+        }
+        
+        .add-note-btn {
+            background: none;
+            border: none;
+            color: #007AFF;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        
+        .add-note-btn:hover {
+            background-color: #e3f2fd;
+        }
+        
+        /* Note styling */
+        .item-note {
+            font-style: italic;
+            color: #666;
+            margin-left: 8px;
         }
         
         /* Auth hints */

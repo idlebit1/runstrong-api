@@ -710,66 +710,89 @@ function formatFileSize(bytes) {
 }
 
 function formatMarkdown(content) {
-    // Track line numbers for interactive features
+    // First pass: convert basic markdown to HTML
     let lineNumber = 0;
-    
-    // Basic markdown formatting for display with interactive elements
-    return content
+    let html = content
         .split('\n')
         .map(line => {
             lineNumber++;
             
-            // Handle checkboxes (make them interactive)
+            // Handle headers first
+            if (line.match(/^# /)) return `<h1>${formatInlineMarkdown(line.replace(/^# /, ''))}</h1>`;
+            if (line.match(/^## /)) return `<h2>${formatInlineMarkdown(line.replace(/^## /, ''))}</h2>`;
+            if (line.match(/^### /)) return `<h3>${formatInlineMarkdown(line.replace(/^### /, ''))}</h3>`;
+            
+            // Handle checkboxes (preserve for interactive conversion)
             if (line.match(/^- \[ \] /)) {
                 const text = line.replace(/^- \[ \] /, '');
-                return `<div class="training-item unchecked" data-line="${lineNumber}" data-type="checkbox">
-                    <input type="checkbox" class="item-checkbox" onchange="toggleCheckbox(this)"> 
-                    <span class="item-text" onclick="showItemActions(this)">${text}</span>
-                    <span class="item-note" style="display: none;"></span>
-                </div>`;
+                return `<div class="markdown-checkbox" data-line="${lineNumber}" data-checked="false">${formatInlineMarkdown(text)}</div>`;
             }
             
             if (line.match(/^- \[x\] /)) {
                 const text = line.replace(/^- \[x\] /, '');
-                return `<div class="training-item checked" data-line="${lineNumber}" data-type="checkbox">
-                    <input type="checkbox" class="item-checkbox" checked onchange="toggleCheckbox(this)"> 
-                    <span class="item-text" onclick="showItemActions(this)">${text}</span>
-                    <span class="item-note" style="display: none;"></span>
-                </div>`;
+                return `<div class="markdown-checkbox" data-line="${lineNumber}" data-checked="true">${formatInlineMarkdown(text)}</div>`;
             }
             
-            // Handle regular list items (make them interactive)
+            // Handle regular list items (preserve for interactive conversion)
             if (line.match(/^- /)) {
                 const text = line.replace(/^- /, '');
-                return `<div class="training-item" data-line="${lineNumber}" data-type="item">
-                    <span class="item-bullet">•</span>
-                    <span class="item-text" onclick="showItemActions(this)">${text}</span>
-                    <span class="item-note" style="display: none;"></span>
-                </div>`;
+                return `<div class="markdown-listitem" data-line="${lineNumber}">${formatInlineMarkdown(text)}</div>`;
             }
             
-            // Handle headers
-            if (line.match(/^# /)) return `<h1>${line.replace(/^# /, '')}</h1>`;
-            if (line.match(/^## /)) return `<h2>${line.replace(/^## /, '')}</h2>`;
-            if (line.match(/^### /)) return `<h3>${line.replace(/^### /, '')}</h3>`;
-            
-            // Handle other markdown
-            let formatted = line
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/`(.*?)`/g, '<code>$1</code>');
-            
+            // Handle regular paragraphs
+            let formatted = formatInlineMarkdown(line);
             return formatted || '<br>';
         })
-        .join('')
-        + `<div class="add-item-section">
-            <button class="add-item-btn" onclick="showAddItemForm()">+ Add Item</button>
-            <div class="add-item-form" style="display: none;">
-                <input type="text" class="add-item-input" placeholder="Enter new item..." onkeypress="handleAddItemKeypress(event)">
-                <button onclick="addNewItem()">Add</button>
-                <button onclick="hideAddItemForm()">Cancel</button>
+        .join('');
+    
+    // Second pass: convert markdown elements to interactive components
+    html = html.replace(/<div class="markdown-checkbox" data-line="(\d+)" data-checked="(true|false)">(.*?)<\/div>/g, (match, lineNum, isChecked, text) => {
+        const checked = isChecked === 'true';
+        const checkedClass = checked ? 'checked' : 'unchecked';
+        const checkedAttr = checked ? 'checked' : '';
+        
+        return `<div class="training-item ${checkedClass}" data-line="${lineNum}" data-type="checkbox">
+            <div class="item-row">
+                <input type="checkbox" class="item-checkbox" ${checkedAttr} onchange="toggleCheckbox(this)"> 
+                <span class="item-text" onclick="showItemActions(this)">${text}</span>
+            </div>
+            <div class="item-note" style="display: none; margin-left: 24px; margin-top: 4px; font-style: italic; color: #666; font-size: 14px;"></div>
+            <div class="add-note-prompt" style="display: none; margin-left: 24px; margin-top: 8px;">
+                <button class="add-note-btn" onclick="addNoteToItem(this)">+ Add note</button>
             </div>
         </div>`;
+    });
+    
+    html = html.replace(/<div class="markdown-listitem" data-line="(\d+)">(.*?)<\/div>/g, (match, lineNum, text) => {
+        return `<div class="training-item" data-line="${lineNum}" data-type="item">
+            <div class="item-row">
+                <span class="item-bullet">•</span>
+                <span class="item-text" onclick="showItemActions(this)">${text}</span>
+            </div>
+            <div class="item-note" style="display: none; margin-left: 24px; margin-top: 4px; font-style: italic; color: #666; font-size: 14px;"></div>
+            <div class="add-note-prompt" style="display: none; margin-left: 24px; margin-top: 8px;">
+                <button class="add-note-btn" onclick="addNoteToItem(this)">+ Add note</button>
+            </div>
+        </div>`;
+    });
+    
+    return html + `<div class="add-item-section">
+        <button class="add-item-btn" onclick="showAddItemForm()">+ Add Item</button>
+        <div class="add-item-form" style="display: none;">
+            <input type="text" class="add-item-input" placeholder="Enter new item..." onkeypress="handleAddItemKeypress(event)">
+            <button onclick="addNewItem()">Add</button>
+            <button onclick="hideAddItemForm()">Cancel</button>
+        </div>
+    </div>`;
+}
+
+function formatInlineMarkdown(text) {
+    return text
+        .replace(/~~(.*?)~~/g, '<del>$1</del>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
 }
 
 // Training day interactive functions
@@ -777,9 +800,20 @@ function toggleCheckbox(checkbox) {
     const trainingItem = checkbox.closest('.training-item');
     const isChecked = checkbox.checked;
     
+    // Hide all existing add-note prompts
+    document.querySelectorAll('.add-note-prompt').forEach(prompt => {
+        prompt.style.display = 'none';
+    });
+    
     if (isChecked) {
         trainingItem.classList.remove('unchecked');
         trainingItem.classList.add('checked');
+        
+        // Show add-note prompt for the most recently checked item
+        const notePrompt = trainingItem.querySelector('.add-note-prompt');
+        if (notePrompt) {
+            notePrompt.style.display = 'block';
+        }
     } else {
         trainingItem.classList.remove('checked');
         trainingItem.classList.add('unchecked');
@@ -795,6 +829,8 @@ function showItemActions(itemText) {
     
     const trainingItem = itemText.closest('.training-item');
     const rect = itemText.getBoundingClientRect();
+    const checkbox = trainingItem.querySelector('.item-checkbox');
+    const isChecked = checkbox ? checkbox.checked : false;
     
     const actionMenu = document.createElement('div');
     actionMenu.className = 'item-action-menu';
@@ -804,18 +840,22 @@ function showItemActions(itemText) {
     actionMenu.style.zIndex = '1000';
     actionMenu.style.backgroundColor = 'white';
     actionMenu.style.border = '1px solid #ccc';
-    actionMenu.style.borderRadius = '4px';
-    actionMenu.style.padding = '8px';
-    actionMenu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+    actionMenu.style.borderRadius = '8px';
+    actionMenu.style.padding = '8px 0';
+    actionMenu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    actionMenu.style.minWidth = '200px';
     
     actionMenu.innerHTML = `
-        <button onclick="addNote(this)" style="display: block; width: 100%; margin-bottom: 4px; padding: 4px 8px; border: none; background: none; text-align: left; cursor: pointer;">📝 Add Note</button>
-        <button onclick="toggleStrikethrough(this)" style="display: block; width: 100%; margin-bottom: 4px; padding: 4px 8px; border: none; background: none; text-align: left; cursor: pointer;">✂️ Strikethrough</button>
-        <button onclick="removeItem(this)" style="display: block; width: 100%; padding: 4px 8px; border: none; background: none; text-align: left; cursor: pointer; color: #d32f2f;">🗑️ Remove</button>
+        <div style="padding: 8px 16px; font-weight: 500; color: #666; border-bottom: 1px solid #eee; margin-bottom: 4px;">What would you like to do?</div>
+        <button onclick="markDone(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">✓ Mark Done</button>
+        <button onclick="doneWithNote(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">📝 Done with Note</button>
+        <button onclick="skipWithReason(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">⚠️ Skip with Reason</button>
+        <button onclick="editActivity(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">✏️ Edit Activity</button>
     `;
     
     // Store reference to the training item
     actionMenu.dataset.trainingItem = trainingItem.dataset.line;
+    actionMenu.dataset.isChecked = isChecked;
     
     document.body.appendChild(actionMenu);
     
@@ -830,25 +870,157 @@ function showItemActions(itemText) {
     }, 100);
 }
 
-function addNote(button) {
+// Quick add note function (for the + Add note button)
+function addNoteToItem(button) {
+    const trainingItem = button.closest('.training-item');
+    const noteSpan = trainingItem.querySelector('.item-note');
+    const notePrompt = trainingItem.querySelector('.add-note-prompt');
+    
+    const newNote = prompt('Add a quick note:');
+    
+    if (newNote !== null && newNote.trim()) {
+        noteSpan.textContent = newNote;
+        noteSpan.style.display = 'block';
+        
+        // Hide the add note prompt
+        notePrompt.style.display = 'none';
+        
+        saveTrainingDayChanges();
+    }
+}
+
+// Menu action functions
+function markDone(button) {
     const menu = button.closest('.item-action-menu');
     const lineNumber = menu.dataset.trainingItem;
     const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
+    const checkbox = trainingItem.querySelector('.item-checkbox');
+    
+    // Remove skipped styling if present
+    const itemText = trainingItem.querySelector('.item-text');
+    if (itemText) {
+        // Remove strikethrough HTML tags
+        itemText.innerHTML = itemText.innerHTML.replace(/<del>(.*?)<\/del>/g, '$1');
+        itemText.style.textDecoration = 'none';
+        itemText.style.opacity = '';
+    }
+    trainingItem.classList.remove('skipped');
+    
+    if (checkbox && !checkbox.checked) {
+        checkbox.checked = true;
+        toggleCheckbox(checkbox);
+    }
+    
+    menu.remove();
+}
+
+function doneWithNote(button) {
+    const menu = button.closest('.item-action-menu');
+    const lineNumber = menu.dataset.trainingItem;
+    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
+    const checkbox = trainingItem.querySelector('.item-checkbox');
     const noteSpan = trainingItem.querySelector('.item-note');
     
-    const existingNote = noteSpan.textContent;
-    const newNote = prompt('Add a note:', existingNote);
+    const newNote = prompt('Done! Add a note:');
     
     if (newNote !== null) {
-        if (newNote.trim()) {
-            noteSpan.textContent = ` (${newNote})`;
-            noteSpan.style.display = 'inline';
-            noteSpan.style.fontStyle = 'italic';
-            noteSpan.style.color = '#666';
-        } else {
-            noteSpan.textContent = '';
-            noteSpan.style.display = 'none';
+        // Remove skipped styling if present
+        const itemText = trainingItem.querySelector('.item-text');
+        if (itemText) {
+            // Remove strikethrough HTML tags
+            itemText.innerHTML = itemText.innerHTML.replace(/<del>(.*?)<\/del>/g, '$1');
+            itemText.style.textDecoration = 'none';
+            itemText.style.opacity = '';
         }
+        trainingItem.classList.remove('skipped');
+        
+        // Mark as done
+        if (checkbox && !checkbox.checked) {
+            checkbox.checked = true;
+            trainingItem.classList.remove('unchecked');
+            trainingItem.classList.add('checked');
+        }
+        
+        // Add note if provided
+        if (newNote.trim()) {
+            noteSpan.textContent = newNote;
+            noteSpan.style.display = 'block';
+        }
+        
+        saveTrainingDayChanges();
+    }
+    
+    menu.remove();
+}
+
+function skipWithReason(button) {
+    const menu = button.closest('.item-action-menu');
+    const lineNumber = menu.dataset.trainingItem;
+    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
+    const checkbox = trainingItem.querySelector('.item-checkbox');
+    const noteSpan = trainingItem.querySelector('.item-note');
+    
+    const reason = prompt('Why are you skipping this?');
+    
+    if (reason !== null) {
+        // Ensure checkbox is unchecked
+        if (checkbox) {
+            checkbox.checked = false;
+            trainingItem.classList.remove('checked');
+            trainingItem.classList.add('unchecked');
+        }
+        
+        // Add strikethrough markdown to the item text
+        const itemText = trainingItem.querySelector('.item-text');
+        if (itemText) {
+            const currentText = itemText.innerHTML;
+            // Only add strikethrough if not already present
+            if (!currentText.includes('<del>')) {
+                // Wrap the current content in strikethrough
+                itemText.innerHTML = `<del>${currentText}</del>`;
+            }
+        }
+        
+        // Add skip reason if provided (formatted like a regular note)
+        if (reason.trim()) {
+            noteSpan.textContent = reason;
+            noteSpan.style.display = 'block';
+            noteSpan.style.color = '#666'; // Same color as regular notes
+        }
+        
+        // Mark the item as skipped for easy identification
+        trainingItem.classList.add('skipped');
+        
+        saveTrainingDayChanges();
+    }
+    
+    menu.remove();
+}
+
+function editActivity(button) {
+    const menu = button.closest('.item-action-menu');
+    const lineNumber = menu.dataset.trainingItem;
+    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
+    const itemText = trainingItem.querySelector('.item-text');
+    
+    const currentText = itemText.textContent;
+    const newText = prompt('Edit activity:', currentText);
+    
+    if (newText !== null && newText.trim() && newText !== currentText) {
+        itemText.textContent = newText;
+        
+        // Add a small edited indicator
+        let editedIndicator = trainingItem.querySelector('.edited-indicator');
+        if (!editedIndicator) {
+            editedIndicator = document.createElement('span');
+            editedIndicator.className = 'edited-indicator';
+            editedIndicator.textContent = ' (edited)';
+            editedIndicator.style.fontSize = '12px';
+            editedIndicator.style.color = '#999';
+            editedIndicator.style.fontStyle = 'italic';
+            itemText.appendChild(editedIndicator);
+        }
+        
         saveTrainingDayChanges();
     }
     
@@ -983,7 +1155,18 @@ function extractMarkdownFromDOM(container) {
                 line = '- ';
             }
             
-            line += itemText.textContent;
+            // Convert HTML back to markdown
+            let textContent = itemText.innerHTML;
+            // Convert strikethrough
+            textContent = textContent.replace(/<del>(.*?)<\/del>/g, '~~$1~~');
+            // Convert other formatting back to markdown
+            textContent = textContent.replace(/<strong>(.*?)<\/strong>/g, '**$1**');
+            textContent = textContent.replace(/<em>(.*?)<\/em>/g, '*$1*');
+            textContent = textContent.replace(/<code>(.*?)<\/code>/g, '`$1`');
+            // Remove any other HTML tags and get text content
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = textContent;
+            line += tempDiv.textContent || tempDiv.innerText;
             
             if (itemNote && itemNote.style.display !== 'none' && itemNote.textContent) {
                 // Extract note text (remove parentheses)

@@ -43,10 +43,18 @@ npm start
    - Ensure `.env` exists with correct `DATABASE_URL`
    - Should be: `postgresql://runstrong:runstrong_dev_password@localhost:5432/runstrong_db`
 
-#### Port 3000 already in use
+#### Port 3000 already in use (COMMON ISSUE)
+**ALWAYS CHECK THIS FIRST** before trying to start the server:
 ```bash
+# Check if server is already running
+curl -s http://localhost:3000/health
+
+# If server responds, it's already running - no need to start again
+# If no response, then kill any lingering processes:
 lsof -ti:3000 | xargs kill -9
 ```
+
+**Claude Assistant**: Before running `npm start`, ALWAYS check if the server is already running with `curl -s http://localhost:3000/health`. If it responds with status "OK", the server is already running and you should NOT try to start it again.
 
 #### Database connection issues
 ```bash
@@ -83,11 +91,12 @@ npm run db:reset
 
 When helping with this project:
 
-1. **Always check if PostgreSQL is running** before debugging server issues
-2. **Use the setup script** for first-time setup
-3. **Refer to README.md** for comprehensive documentation
-4. **Remember the interactive training features** - this is a key differentiator
-5. **Use PostgreSQL consistently** across all environments
+1. **ALWAYS check if the server is already running** with `curl -s http://localhost:3000/health` before trying to start it
+2. **Always check if PostgreSQL is running** before debugging server issues
+3. **Use the setup script** for first-time setup
+4. **Refer to README.md** for comprehensive documentation
+5. **Remember the interactive training features** - this is a key differentiator
+6. **Use PostgreSQL consistently** across all environments
 
 ### Interactive Training Features
 The app has special interactive features for training day files:
