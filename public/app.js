@@ -186,7 +186,18 @@ async function login(email, password) {
         
     } catch (error) {
         console.error('Login error:', error);
-        showError('login-error', error.message);
+        let errorMessage = error.message;
+        
+        // Provide more helpful error messages
+        if (error.message.includes('Invalid email or password')) {
+            errorMessage = 'Invalid email or password. Don\'t have an account? Click "Register" to create one.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+            errorMessage = 'Connection error. Please check your internet connection and try again.';
+        } else if (error.message.includes('server')) {
+            errorMessage = 'Server error. Please try again in a moment.';
+        }
+        
+        showError('login-error', errorMessage);
     } finally {
         const button = document.querySelector('#login-form .auth-button');
         button.disabled = false;
@@ -229,7 +240,22 @@ async function register(name, email, password) {
         
     } catch (error) {
         console.error('Register error:', error);
-        showError('register-error', error.message);
+        let errorMessage = error.message;
+        
+        // Provide more helpful error messages
+        if (error.message.includes('User with this email already exists')) {
+            errorMessage = 'An account with this email already exists. Try logging in instead, or use a different email.';
+        } else if (error.message.includes('Password must be')) {
+            errorMessage = 'Password must be at least 6 characters long.';
+        } else if (error.message.includes('Email and password are required')) {
+            errorMessage = 'Please fill in all required fields.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+            errorMessage = 'Connection error. Please check your internet connection and try again.';
+        } else if (error.message.includes('server')) {
+            errorMessage = 'Server error. Please try again in a moment.';
+        }
+        
+        showError('register-error', errorMessage);
     } finally {
         const button = document.querySelector('#register-form .auth-button');
         button.disabled = false;
@@ -321,9 +347,23 @@ function showError(elementId, message) {
     errorElement.style.display = 'block';
 }
 
+function showSuccess(elementId, message) {
+    const successElement = document.getElementById(elementId);
+    if (successElement) {
+        successElement.textContent = message;
+        successElement.style.display = 'block';
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+            successElement.style.display = 'none';
+        }, 3000);
+    }
+}
+
 function clearAuthErrors() {
     document.getElementById('login-error').style.display = 'none';
     document.getElementById('register-error').style.display = 'none';
+    const successElement = document.getElementById('register-success');
+    if (successElement) successElement.style.display = 'none';
 }
 
 function handleKeyDown(event) {

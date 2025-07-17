@@ -162,10 +162,26 @@
         }
         .error {
             color: #d32f2f;
-            padding: 10px;
+            padding: 12px;
             background: #ffebee;
-            border-radius: 4px;
-            margin: 10px 0;
+            border: 1px solid #ffcdd2;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-size: 14px;
+            line-height: 1.4;
+            border-left: 4px solid #d32f2f;
+        }
+        
+        .success {
+            color: #2e7d32;
+            padding: 12px;
+            background: #e8f5e8;
+            border: 1px solid #c8e6c9;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-size: 14px;
+            line-height: 1.4;
+            border-left: 4px solid #2e7d32;
         }
         .file-item {
             padding: 12px;
@@ -454,6 +470,21 @@
         .item-action-menu button:last-child {
             border-radius: 0 0 6px 6px;
         }
+        
+        /* Auth hints */
+        .auth-hint {
+            margin-top: 15px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        /* Better placeholders */
+        input::placeholder {
+            color: #999;
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -474,36 +505,40 @@
             <form id="login-form" class="auth-form active">
                 <div class="form-group">
                     <label for="login-email">Email</label>
-                    <input type="email" id="login-email" required>
+                    <input type="email" id="login-email" required placeholder="your@email.com">
                 </div>
                 <div class="form-group">
                     <label for="login-password">Password</label>
-                    <input type="password" id="login-password" required>
+                    <input type="password" id="login-password" required placeholder="Enter your password">
                 </div>
                 <button type="submit" class="auth-button">Login</button>
                 <div id="login-error" class="error" style="display: none;"></div>
+                <p class="auth-hint">Don't have an account? Click "Register" above to create one.<br>
+                <small>Demo: <code>test@example.com</code> / <code>password123</code></small></p>
             </form>
 
             <!-- Register Form -->
             <form id="register-form" class="auth-form">
                 <div class="form-group">
                     <label for="register-name">Name (optional)</label>
-                    <input type="text" id="register-name">
+                    <input type="text" id="register-name" placeholder="Your name">
                 </div>
                 <div class="form-group">
                     <label for="register-email">Email</label>
-                    <input type="email" id="register-email" required>
+                    <input type="email" id="register-email" required placeholder="your@email.com">
                 </div>
                 <div class="form-group">
                     <label for="register-password">Password</label>
-                    <input type="password" id="register-password" required minlength="6">
+                    <input type="password" id="register-password" required minlength="6" placeholder="At least 6 characters">
                 </div>
                 <div class="form-group">
                     <label for="register-confirm">Confirm Password</label>
-                    <input type="password" id="register-confirm" required minlength="6">
+                    <input type="password" id="register-confirm" required minlength="6" placeholder="Enter password again">
                 </div>
                 <button type="submit" class="auth-button">Register</button>
                 <div id="register-error" class="error" style="display: none;"></div>
+                <div id="register-success" class="success" style="display: none;"></div>
+                <p class="auth-hint">Already have an account? Click "Login" above to sign in.</p>
             </form>
         </div>
     </div>
