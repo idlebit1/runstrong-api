@@ -668,17 +668,298 @@ function formatFileSize(bytes) {
 }
 
 function formatMarkdown(content) {
-    // Basic markdown formatting for display
+    // Track line numbers for interactive features
+    let lineNumber = 0;
+    
+    // Basic markdown formatting for display with interactive elements
     return content
-        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/`(.*?)`/g, '<code>$1</code>')
-        .replace(/^- \[ \] (.*$)/gm, '<div>☐ $1</div>')
-        .replace(/^- \[x\] (.*$)/gm, '<div>☑ $1</div>')
-        .replace(/^- (.*$)/gm, '<div>• $1</div>')
-        .replace(/\n\n/g, '<br><br>')
-        .replace(/\n/g, '<br>');
+        .split('\n')
+        .map(line => {
+            lineNumber++;
+            
+            // Handle checkboxes (make them interactive)
+            if (line.match(/^- \[ \] /)) {
+                const text = line.replace(/^- \[ \] /, '');
+                return `<div class="training-item unchecked" data-line="${lineNumber}" data-type="checkbox">
+                    <input type="checkbox" class="item-checkbox" onchange="toggleCheckbox(this)"> 
+                    <span class="item-text" onclick="showItemActions(this)">${text}</span>
+                    <span class="item-note" style="display: none;"></span>
+                </div>`;
+            }
+            
+            if (line.match(/^- \[x\] /)) {
+                const text = line.replace(/^- \[x\] /, '');
+                return `<div class="training-item checked" data-line="${lineNumber}" data-type="checkbox">
+                    <input type="checkbox" class="item-checkbox" checked onchange="toggleCheckbox(this)"> 
+                    <span class="item-text" onclick="showItemActions(this)">${text}</span>
+                    <span class="item-note" style="display: none;"></span>
+                </div>`;
+            }
+            
+            // Handle regular list items (make them interactive)
+            if (line.match(/^- /)) {
+                const text = line.replace(/^- /, '');
+                return `<div class="training-item" data-line="${lineNumber}" data-type="item">
+                    <span class="item-bullet">•</span>
+                    <span class="item-text" onclick="showItemActions(this)">${text}</span>
+                    <span class="item-note" style="display: none;"></span>
+                </div>`;
+            }
+            
+            // Handle headers
+            if (line.match(/^# /)) return `<h1>${line.replace(/^# /, '')}</h1>`;
+            if (line.match(/^## /)) return `<h2>${line.replace(/^## /, '')}</h2>`;
+            if (line.match(/^### /)) return `<h3>${line.replace(/^### /, '')}</h3>`;
+            
+            // Handle other markdown
+            let formatted = line
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`(.*?)`/g, '<code>$1</code>');
+            
+            return formatted || '<br>';
+        })
+        .join('')
+        + `<div class="add-item-section">
+            <button class="add-item-btn" onclick="showAddItemForm()">+ Add Item</button>
+            <div class="add-item-form" style="display: none;">
+                <input type="text" class="add-item-input" placeholder="Enter new item..." onkeypress="handleAddItemKeypress(event)">
+                <button onclick="addNewItem()">Add</button>
+                <button onclick="hideAddItemForm()">Cancel</button>
+            </div>
+        </div>`;
+}
+
+// Training day interactive functions
+function toggleCheckbox(checkbox) {
+    const trainingItem = checkbox.closest('.training-item');
+    const isChecked = checkbox.checked;
+    
+    if (isChecked) {
+        trainingItem.classList.remove('unchecked');
+        trainingItem.classList.add('checked');
+    } else {
+        trainingItem.classList.remove('checked');
+        trainingItem.classList.add('unchecked');
+    }
+    
+    // Save the change to the file
+    saveTrainingDayChanges();
+}
+
+function showItemActions(itemText) {
+    // Remove any existing action menus
+    document.querySelectorAll('.item-action-menu').forEach(menu => menu.remove());
+    
+    const trainingItem = itemText.closest('.training-item');
+    const rect = itemText.getBoundingClientRect();
+    
+    const actionMenu = document.createElement('div');
+    actionMenu.className = 'item-action-menu';
+    actionMenu.style.position = 'fixed';
+    actionMenu.style.top = (rect.bottom + 5) + 'px';
+    actionMenu.style.left = rect.left + 'px';
+    actionMenu.style.zIndex = '1000';
+    actionMenu.style.backgroundColor = 'white';
+    actionMenu.style.border = '1px solid #ccc';
+    actionMenu.style.borderRadius = '4px';
+    actionMenu.style.padding = '8px';
+    actionMenu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+    
+    actionMenu.innerHTML = `
+        <button onclick="addNote(this)" style="display: block; width: 100%; margin-bottom: 4px; padding: 4px 8px; border: none; background: none; text-align: left; cursor: pointer;">📝 Add Note</button>
+        <button onclick="toggleStrikethrough(this)" style="display: block; width: 100%; margin-bottom: 4px; padding: 4px 8px; border: none; background: none; text-align: left; cursor: pointer;">✂️ Strikethrough</button>
+        <button onclick="removeItem(this)" style="display: block; width: 100%; padding: 4px 8px; border: none; background: none; text-align: left; cursor: pointer; color: #d32f2f;">🗑️ Remove</button>
+    `;
+    
+    // Store reference to the training item
+    actionMenu.dataset.trainingItem = trainingItem.dataset.line;
+    
+    document.body.appendChild(actionMenu);
+    
+    // Close menu when clicking outside
+    setTimeout(() => {
+        document.addEventListener('click', function closeMenu(e) {
+            if (!actionMenu.contains(e.target)) {
+                actionMenu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        });
+    }, 100);
+}
+
+function addNote(button) {
+    const menu = button.closest('.item-action-menu');
+    const lineNumber = menu.dataset.trainingItem;
+    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
+    const noteSpan = trainingItem.querySelector('.item-note');
+    
+    const existingNote = noteSpan.textContent;
+    const newNote = prompt('Add a note:', existingNote);
+    
+    if (newNote !== null) {
+        if (newNote.trim()) {
+            noteSpan.textContent = ` (${newNote})`;
+            noteSpan.style.display = 'inline';
+            noteSpan.style.fontStyle = 'italic';
+            noteSpan.style.color = '#666';
+        } else {
+            noteSpan.textContent = '';
+            noteSpan.style.display = 'none';
+        }
+        saveTrainingDayChanges();
+    }
+    
+    menu.remove();
+}
+
+function toggleStrikethrough(button) {
+    const menu = button.closest('.item-action-menu');
+    const lineNumber = menu.dataset.trainingItem;
+    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
+    const itemText = trainingItem.querySelector('.item-text');
+    
+    if (itemText.style.textDecoration === 'line-through') {
+        itemText.style.textDecoration = 'none';
+        itemText.style.opacity = '1';
+    } else {
+        itemText.style.textDecoration = 'line-through';
+        itemText.style.opacity = '0.6';
+    }
+    
+    saveTrainingDayChanges();
+    menu.remove();
+}
+
+function removeItem(button) {
+    const menu = button.closest('.item-action-menu');
+    const lineNumber = menu.dataset.trainingItem;
+    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
+    
+    if (confirm('Remove this item?')) {
+        trainingItem.remove();
+        saveTrainingDayChanges();
+    }
+    
+    menu.remove();
+}
+
+function showAddItemForm() {
+    const form = document.querySelector('.add-item-form');
+    const button = document.querySelector('.add-item-btn');
+    const input = document.querySelector('.add-item-input');
+    
+    form.style.display = 'block';
+    button.style.display = 'none';
+    input.focus();
+}
+
+function hideAddItemForm() {
+    const form = document.querySelector('.add-item-form');
+    const button = document.querySelector('.add-item-btn');
+    const input = document.querySelector('.add-item-input');
+    
+    form.style.display = 'none';
+    button.style.display = 'block';
+    input.value = '';
+}
+
+function handleAddItemKeypress(event) {
+    if (event.key === 'Enter') {
+        addNewItem();
+    } else if (event.key === 'Escape') {
+        hideAddItemForm();
+    }
+}
+
+function addNewItem() {
+    const input = document.querySelector('.add-item-input');
+    const text = input.value.trim();
+    
+    if (!text) return;
+    
+    const addItemSection = document.querySelector('.add-item-section');
+    const newItem = document.createElement('div');
+    newItem.className = 'training-item';
+    newItem.dataset.line = Date.now(); // Use timestamp as unique identifier
+    newItem.dataset.type = 'item';
+    
+    newItem.innerHTML = `
+        <span class="item-bullet">•</span>
+        <span class="item-text" onclick="showItemActions(this)">${text}</span>
+        <span class="item-note" style="display: none;"></span>
+    `;
+    
+    addItemSection.parentNode.insertBefore(newItem, addItemSection);
+    
+    hideAddItemForm();
+    saveTrainingDayChanges();
+}
+
+async function saveTrainingDayChanges() {
+    if (!currentFileId) return;
+    
+    try {
+        // Extract current content from the DOM
+        const fileContent = document.getElementById('fileContent');
+        const updatedContent = extractMarkdownFromDOM(fileContent);
+        
+        // Save to backend
+        await apiCall(`${API_BASE}/coach/files/${document.getElementById('fileTitle').textContent}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                content: updatedContent
+            })
+        });
+        
+        console.log('Training day changes saved');
+    } catch (error) {
+        console.error('Failed to save training day changes:', error);
+    }
+}
+
+function extractMarkdownFromDOM(container) {
+    let markdown = '';
+    
+    for (const element of container.children) {
+        if (element.tagName === 'H1') {
+            markdown += `# ${element.textContent}\n`;
+        } else if (element.tagName === 'H2') {
+            markdown += `## ${element.textContent}\n`;
+        } else if (element.tagName === 'H3') {
+            markdown += `### ${element.textContent}\n`;
+        } else if (element.classList.contains('training-item')) {
+            const itemText = element.querySelector('.item-text');
+            const itemNote = element.querySelector('.item-note');
+            const checkbox = element.querySelector('.item-checkbox');
+            
+            let line = '';
+            
+            if (checkbox) {
+                line = checkbox.checked ? '- [x] ' : '- [ ] ';
+            } else {
+                line = '- ';
+            }
+            
+            line += itemText.textContent;
+            
+            if (itemNote && itemNote.style.display !== 'none' && itemNote.textContent) {
+                // Extract note text (remove parentheses)
+                const noteText = itemNote.textContent.replace(/^\s*\(|\)\s*$/g, '');
+                line += ` (${noteText})`;
+            }
+            
+            markdown += line + '\n';
+        } else if (element.classList.contains('add-item-section')) {
+            // Skip the add item section
+            continue;
+        } else if (element.tagName === 'BR') {
+            markdown += '\n';
+        } else {
+            // Handle other content
+            markdown += element.textContent + '\n';
+        }
+    }
+    
+    return markdown.trim();
 }

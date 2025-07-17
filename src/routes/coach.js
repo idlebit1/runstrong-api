@@ -299,6 +299,29 @@ router.get('/files/:fileName', async (req, res) => {
   }
 });
 
+router.put('/files/:fileName', async (req, res) => {
+  try {
+    const { fileName } = req.params;
+    const { content } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ error: 'Content is required' });
+    }
+    
+    const userIdToUse = req.user.userId;
+    const result = await databaseFileService.writeFile(userIdToUse, fileName, content);
+    
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
+    
+    res.json({ success: true, message: 'File updated successfully' });
+  } catch (error) {
+    console.error('File update endpoint error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/files', async (req, res) => {
   try {
     const userId = req.user.userId;
