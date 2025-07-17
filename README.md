@@ -1,41 +1,63 @@
-# RunStrong API
+# RunStrong AI Coach API
 
-An API for an AI-powered running coach that provides personalized training advice and plans.
+A Node.js API for the RunStrong AI running coach with JWT authentication and interactive training day features.
+
+## Quick Start (Local Development)
+
+### Prerequisites
+- Node.js 18+
+- Docker (for PostgreSQL)
+- Git
+
+### Option 1: Automated Setup (Recommended)
+```bash
+git clone <repository-url>
+cd runstrong-api
+npm install
+./scripts/dev-setup.sh
+npm start
+```
+
+### Option 2: Manual Setup
+```bash
+git clone <repository-url>
+cd runstrong-api
+npm install
+npm run setup  # Starts database and runs migrations
+npm start
+```
+
+### ⚠️ Don't forget!
+- Edit `.env` and add your Anthropic API key
+- Open http://localhost:3000 to test
+- Register a new account and try the interactive training features
 
 ## Features
 
-- **Authentication**: JWT and API key based authentication
-- **AI Coach Chat**: Interactive conversations with Claude Sonnet 4
-- **Training Plans**: AI-generated personalized training plans
-- **Virtual File System**: Store and retrieve user data and progress
-- **Security**: Rate limiting, CORS, and secure file operations
+### Authentication
+- JWT-based user authentication
+- User registration and login
+- Token refresh mechanism
+- Secure password hashing with bcrypt
 
-## Setup
+### AI Coach Integration
+- Anthropic Claude integration
+- Conversation management
+- Context-aware responses
+- Training plan generation
 
-1. Install dependencies:
-```bash
-npm install
-```
+### Interactive Training Days
+- ✅ **Checkboxes** - Mark items as complete
+- 📝 **Notes** - Add personal notes to any item
+- ✂️ **Strikethrough** - Mark items as done
+- ➕ **Add Items** - Add custom training tasks
+- 💾 **Auto-save** - Changes saved automatically
 
-2. Create `.env` file:
-```bash
-cp .env.example .env
-```
-
-3. Configure environment variables:
-```
-PORT=3000
-JWT_SECRET=your-jwt-secret-key-here
-ANTHROPIC_API_KEY=your-anthropic-api-key-here
-VALID_API_KEYS=api-key-1,api-key-2
-NODE_ENV=development
-LOG_LEVEL=info
-```
-
-4. Start the server:
-```bash
-npm run dev
-```
+### File Management
+- Markdown file storage and display
+- Training plan persistence
+- User profile management
+- File versioning
 
 ## Testing Locally
 
