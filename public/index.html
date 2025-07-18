@@ -207,15 +207,6 @@
             color: #666;
         }
         
-        .changelog-file {
-            background-color: #f8f9fa;
-            border-left: 3px solid #6c757d;
-        }
-        
-        .changelog-file .file-name {
-            color: #495057;
-            font-style: italic;
-        }
         .file-viewer {
             flex: 1;
             background: white;
@@ -531,6 +522,85 @@
             font-style: italic;
             color: #666;
             margin-left: 8px;
+            transition: background-color 0.2s;
+            border: 1px solid transparent;
+        }
+        
+        .item-note:hover {
+            background-color: #e3f2fd !important;
+            border-color: #2196f3;
+        }
+        
+        .item-note:empty {
+            display: none !important;
+        }
+        
+        /* Note Editor Styling */
+        .note-editor {
+            animation: slideIn 0.2s ease-out;
+        }
+        
+        .note-editor input {
+            transition: all 0.2s ease;
+        }
+        
+        .note-editor input:focus {
+            background-color: #f8f9fa;
+        }
+        
+        .note-editor button:hover {
+            transform: scale(1.05);
+            transition: transform 0.1s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Mobile-friendly touch targets */
+        @media (max-width: 768px) {
+            .item-note {
+                min-height: 44px;
+                padding: 8px !important;
+                margin-top: 8px;
+                display: flex;
+                align-items: center;
+            }
+            
+            .item-action-menu {
+                min-width: 240px !important;
+                font-size: 16px !important;
+            }
+            
+            .item-action-menu button {
+                padding: 16px 20px !important;
+                font-size: 16px !important;
+                min-height: 48px;
+            }
+            
+            .note-editor {
+                padding: 12px !important;
+                gap: 12px !important;
+            }
+            
+            .note-editor input {
+                font-size: 16px !important;
+                min-height: 44px;
+                padding: 8px !important;
+            }
+            
+            .note-editor button {
+                width: 44px !important;
+                height: 44px !important;
+                font-size: 16px !important;
+            }
         }
         
         /* Auth hints */
@@ -690,7 +760,6 @@
                 </div>
                 <div class="file-actions">
                     <button id="viewRawBtn" class="debug-btn" style="display: none;" onclick="toggleRawView()">📄 Raw</button>
-                    <button id="viewChangelogBtn" class="debug-btn" style="display: none;" onclick="viewChangelog()">📊 Changelog</button>
                     <button id="backToChatBtn">← Back to Chat</button>
                 </div>
             </div>

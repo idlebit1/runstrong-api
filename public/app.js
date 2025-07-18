@@ -5,58 +5,11 @@ let currentUser = null;
 let currentConversationId = null;
 let currentFileId = null;
 let currentView = 'chat'; // 'chat' or 'file'
-let fileChangeLog = []; // Track all changes to the current file
+// File change tracking removed
 let currentFileData = null; // Store current file data for debug views
 let isRawView = false; // Track if showing raw markdown
 
-// Function to log user actions
-function logFileChange(action, details = {}) {
-    const logEntry = {
-        timestamp: new Date().toISOString(),
-        action: action,
-        details: details,
-        user: currentUser?.email || 'unknown'
-    };
-    
-    fileChangeLog.push(logEntry);
-    console.log('File change logged:', logEntry);
-}
-
-// Function to get the change log (for AI agent access)
-function getFileChangeLog() {
-    return {
-        fileName: document.getElementById('fileTitle')?.textContent || 'unknown',
-        totalChanges: fileChangeLog.length,
-        changes: fileChangeLog,
-        summary: generateChangeLogSummary()
-    };
-}
-
-// Function to generate a human-readable summary of changes
-function generateChangeLogSummary() {
-    const summary = {
-        checkboxToggles: fileChangeLog.filter(log => log.action === 'checkbox_toggle').length,
-        notesAdded: fileChangeLog.filter(log => log.action === 'note_added' || log.action === 'done_with_note').length,
-        itemsSkipped: fileChangeLog.filter(log => log.action === 'skip_with_reason').length,
-        itemsEdited: fileChangeLog.filter(log => log.action === 'edit_activity').length,
-        markDoneActions: fileChangeLog.filter(log => log.action === 'mark_done').length,
-        timeSpent: null
-    };
-    
-    // Calculate time spent if we have file_opened
-    const fileOpened = fileChangeLog.find(log => log.action === 'file_opened');
-    const lastAction = fileChangeLog[fileChangeLog.length - 1];
-    if (fileOpened && lastAction) {
-        const startTime = new Date(fileOpened.timestamp);
-        const endTime = new Date(lastAction.timestamp);
-        summary.timeSpent = Math.round((endTime - startTime) / 1000); // seconds
-    }
-    
-    return summary;
-}
-
-// Make change log available globally for AI agent
-window.getFileChangeLog = getFileChangeLog;
+// Change log functionality removed
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -702,14 +655,12 @@ async function refreshFiles() {
         }
         
         list.innerHTML = result.files.map(file => {
-            const isChangeLog = file.fileName.endsWith('.changelog');
             return `
-            <div class="file-item ${file.id === currentFileId ? 'active' : ''} ${isChangeLog ? 'changelog-file' : ''}" 
+            <div class="file-item ${file.id === currentFileId ? 'active' : ''}" 
                  data-file-id="${file.id}">
-                <div class="file-name">${file.fileName} ${isChangeLog ? '📊' : ''}</div>
+                <div class="file-name">${file.fileName}</div>
                 <div class="file-meta">
                     ${file.fileType} • ${formatFileSize(file.size)} • ${new Date(file.updatedAt).toLocaleDateString()}
-                    ${isChangeLog ? ' • Read-only' : ''}
                 </div>
             </div>
         `;
@@ -737,15 +688,9 @@ async function loadFile(fileId, fileName) {
         currentFileData = result; // Store file data for debug views
         isRawView = false; // Reset raw view state
         
-        // Reset change log for new file
-        fileChangeLog = [];
+        // File loaded
         
-        // Log file opening
-        logFileChange('file_opened', {
-            fileName: fileName,
-            fileSize: result.content ? result.content.length : 0,
-            fileType: fileName.split('.').pop()
-        });
+        // File opened
         
         document.getElementById('fileTitle').textContent = fileName;
         document.getElementById('fileSubtitle').textContent = 
@@ -753,20 +698,14 @@ async function loadFile(fileId, fileName) {
         
         const contentDiv = document.getElementById('fileContent');
         
-        // Handle changelog files specially
-        if (result.isChangeLog) {
-            document.getElementById('fileSubtitle').textContent = 
-                `Read-only change log • Last updated: ${new Date().toLocaleDateString()}`;
-            contentDiv.className = 'file-content markdown';
-            contentDiv.innerHTML = formatMarkdown(result.content);
-            // Add visual indicator for read-only
-            contentDiv.style.backgroundColor = '#f9f9f9';
-            contentDiv.style.border = '2px solid #e9ecef';
-        }
         // Determine content type and apply appropriate formatting
-        else if (fileName.trim().endsWith('.md') || fileName.trim().endsWith('.markdown')) {
+        if (fileName.trim().endsWith('.md') || fileName.trim().endsWith('.markdown')) {
             console.log('Processing markdown file:', fileName);
             console.log('Raw content:', result.content);
+            
+            // Store original markdown for direct editing
+            originalMarkdownContent = result.content;
+            
             const formattedContent = formatMarkdown(result.content);
             console.log('Formatted content:', formattedContent);
             contentDiv.className = 'file-content markdown';
@@ -788,20 +727,27 @@ async function loadFile(fileId, fileName) {
         
         // Show debug buttons for loaded files
         document.getElementById('viewRawBtn').style.display = 'inline-block';
-        if (!fileName.endsWith('.changelog')) {
-            document.getElementById('viewChangelogBtn').style.display = 'inline-block';
-        } else {
-            document.getElementById('viewChangelogBtn').style.display = 'none';
-        }
         
-        // Update file list to show active file
-        refreshFiles();
+        // Update file list to show active file (without API call)
+        updateActiveFileInList();
         
         // Switch to file view
         showFileView();
     } catch (error) {
         showError('Failed to load file: ' + error.message);
     }
+}
+
+function updateActiveFileInList() {
+    // Update the file list UI to show which file is active without making an API call
+    const fileItems = document.querySelectorAll('.file-item');
+    fileItems.forEach(item => {
+        if (item.getAttribute('data-file-id') === currentFileId) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
 }
 
 function formatFileSize(bytes) {
@@ -813,7 +759,9 @@ function formatFileSize(bytes) {
 }
 
 function formatMarkdown(content) {
-    const lines = content.split('\n');
+    // First, clean up the content by removing excessive empty lines
+    const cleanContent = content.replace(/\n\s*\n\s*\n/g, '\n\n'); // Replace 3+ newlines with 2
+    const lines = cleanContent.split('\n');
     let html = '';
     let lineNumber = 0;
     
@@ -821,17 +769,104 @@ function formatMarkdown(content) {
         const line = lines[i];
         lineNumber++;
         
-        // Handle headers
+        // Skip completely empty lines
+        if (line.trim() === '') {
+            continue;
+        }
+        
+        // Handle headers (make them interactive)
         if (line.match(/^# /)) {
-            html += `<h1>${formatInlineMarkdown(line.replace(/^# /, ''))}</h1>`;
+            const text = line.replace(/^# /, '');
+            // Check if heading is wrapped in strikethrough (skipped)
+            let isSkipped = false;
+            let displayText = text;
+            if (text.match(/^~~(.*)~~$/)) {
+                isSkipped = true;
+                displayText = text.replace(/^~~(.*)~~$/, '$1');
+            }
+            
+            // Extract note if present
+            let noteText = '';
+            const noteMatch = displayText.match(/^(.*?)\s*\[NOTE:\s*([^\]]+)\]\s*$/);
+            if (noteMatch) {
+                displayText = noteMatch[1].trim();
+                noteText = noteMatch[2].trim();
+            }
+            
+            const noteDisplay = noteText ? 'block' : 'none';
+            const noteContent = noteText ? noteText : '';
+            const skippedClass = isSkipped ? ' skipped' : '';
+            const addNoteDisplay = noteText ? 'none' : 'none'; // Never show by default, controlled by actions
+            
+            html += `<div class="training-item${skippedClass}" data-line="${lineNumber}" data-type="heading">
+                <h1 class="item-text" onclick="showItemActions(this)">${formatInlineMarkdown(displayText)}</h1>
+                <div class="item-note" style="display: ${noteDisplay}; margin-left: 24px; margin-top: 4px; font-style: italic; color: #666; font-size: 14px; cursor: pointer; padding: 4px; border-radius: 3px; background-color: #f8f9fa;" onclick="editNote(this)">${noteContent}</div>
+                <div class="add-note-prompt" style="display: ${addNoteDisplay}; margin-left: 24px; margin-top: 8px;">
+                    <button class="add-note-btn" onclick="addNoteToItem(this)">+ Add note</button>
+                </div>
+            </div>`;
             continue;
         }
         if (line.match(/^## /)) {
-            html += `<h2>${formatInlineMarkdown(line.replace(/^## /, ''))}</h2>`;
+            const text = line.replace(/^## /, '');
+            // Check if heading is wrapped in strikethrough (skipped)
+            let isSkipped = false;
+            let displayText = text;
+            if (text.match(/^~~(.*)~~$/)) {
+                isSkipped = true;
+                displayText = text.replace(/^~~(.*)~~$/, '$1');
+            }
+            
+            // Extract note if present
+            let noteText = '';
+            const noteMatch = displayText.match(/^(.*?)\s*\[NOTE:\s*([^\]]+)\]\s*$/);
+            if (noteMatch) {
+                displayText = noteMatch[1].trim();
+                noteText = noteMatch[2].trim();
+            }
+            
+            const noteDisplay = noteText ? 'block' : 'none';
+            const noteContent = noteText ? noteText : '';
+            const skippedClass = isSkipped ? ' skipped' : '';
+            
+            html += `<div class="training-item${skippedClass}" data-line="${lineNumber}" data-type="heading">
+                <h2 class="item-text" onclick="showItemActions(this)">${formatInlineMarkdown(displayText)}</h2>
+                <div class="item-note" style="display: ${noteDisplay}; margin-left: 24px; margin-top: 4px; font-style: italic; color: #666; font-size: 14px; cursor: pointer; padding: 4px; border-radius: 3px; background-color: #f8f9fa;" onclick="editNote(this)">${noteContent}</div>
+                <div class="add-note-prompt" style="display: none; margin-left: 24px; margin-top: 8px;">
+                    <button class="add-note-btn" onclick="addNoteToItem(this)">+ Add note</button>
+                </div>
+            </div>`;
             continue;
         }
         if (line.match(/^### /)) {
-            html += `<h3>${formatInlineMarkdown(line.replace(/^### /, ''))}</h3>`;
+            const text = line.replace(/^### /, '');
+            // Check if heading is wrapped in strikethrough (skipped)
+            let isSkipped = false;
+            let displayText = text;
+            if (text.match(/^~~(.*)~~$/)) {
+                isSkipped = true;
+                displayText = text.replace(/^~~(.*)~~$/, '$1');
+            }
+            
+            // Extract note if present
+            let noteText = '';
+            const noteMatch = displayText.match(/^(.*?)\s*\[NOTE:\s*([^\]]+)\]\s*$/);
+            if (noteMatch) {
+                displayText = noteMatch[1].trim();
+                noteText = noteMatch[2].trim();
+            }
+            
+            const noteDisplay = noteText ? 'block' : 'none';
+            const noteContent = noteText ? noteText : '';
+            const skippedClass = isSkipped ? ' skipped' : '';
+            
+            html += `<div class="training-item${skippedClass}" data-line="${lineNumber}" data-type="heading">
+                <h3 class="item-text" onclick="showItemActions(this)">${formatInlineMarkdown(displayText)}</h3>
+                <div class="item-note" style="display: ${noteDisplay}; margin-left: 24px; margin-top: 4px; font-style: italic; color: #666; font-size: 14px; cursor: pointer; padding: 4px; border-radius: 3px; background-color: #f8f9fa;" onclick="editNote(this)">${noteContent}</div>
+                <div class="add-note-prompt" style="display: none; margin-left: 24px; margin-top: 8px;">
+                    <button class="add-note-btn" onclick="addNoteToItem(this)">+ Add note</button>
+                </div>
+            </div>`;
             continue;
         }
         
@@ -839,19 +874,39 @@ function formatMarkdown(content) {
         if (line.match(/^(\s*)- \[(?:x| )\] /)) {
             const indent = line.match(/^(\s*)/)[1].length;
             const isChecked = line.match(/^(\s*)- \[x\] /) ? 'true' : 'false';
-            const text = line.replace(/^(\s*)- \[(?:x| )\] /, '');
+            let text = line.replace(/^(\s*)- \[(?:x| )\] /, '');
             const checked = isChecked === 'true';
             const checkedClass = checked ? 'checked' : 'unchecked';
             const checkedAttr = checked ? 'checked' : '';
             const marginLeft = indent * 12; // 12px per indent level
             
-            html += `<div class="training-item ${checkedClass}" data-line="${lineNumber}" data-type="checkbox" style="margin-left: ${marginLeft}px;">
+            // Check if text is wrapped in strikethrough (skipped)
+            let isSkipped = false;
+            if (text.match(/^~~(.*)~~$/)) {
+                isSkipped = true;
+                text = text.replace(/^~~(.*)~~$/, '$1');
+            }
+            
+            // Extract note if present (text in [NOTE: ...] format at the end)
+            let noteText = '';
+            const noteMatch = text.match(/^(.*?)\s*\[NOTE:\s*([^\]]+)\]\s*$/);
+            if (noteMatch) {
+                text = noteMatch[1].trim();
+                noteText = noteMatch[2].trim();
+            }
+            
+            const noteDisplay = noteText ? 'block' : 'none';
+            const noteContent = noteText ? noteText : '';
+            const skippedClass = isSkipped ? ' skipped' : '';
+            const addNoteDisplay = noteText ? 'none' : 'none'; // Never show by default, controlled by actions
+            
+            html += `<div class="training-item ${checkedClass}${skippedClass}" data-line="${lineNumber}" data-type="checkbox" style="margin-left: ${marginLeft}px;">
                 <div class="item-row">
                     <input type="checkbox" class="item-checkbox" ${checkedAttr} onchange="toggleCheckbox(this)"> 
                     <span class="item-text" onclick="showItemActions(this)">${formatInlineMarkdown(text)}</span>
                 </div>
-                <div class="item-note" style="display: none; margin-left: 24px; margin-top: 4px; font-style: italic; color: #666; font-size: 14px;"></div>
-                <div class="add-note-prompt" style="display: none; margin-left: 24px; margin-top: 8px;">
+                <div class="item-note" style="display: ${noteDisplay}; margin-left: 24px; margin-top: 4px; font-style: italic; color: #666; font-size: 14px; cursor: pointer; padding: 4px; border-radius: 3px; background-color: #f8f9fa;" onclick="editNote(this)">${noteContent}</div>
+                <div class="add-note-prompt" style="display: ${addNoteDisplay}; margin-left: 24px; margin-top: 8px;">
                     <button class="add-note-btn" onclick="addNoteToItem(this)">+ Add note</button>
                 </div>
             </div>`;
@@ -861,26 +916,71 @@ function formatMarkdown(content) {
         // Handle any level of indented regular list items (make them ALL interactive)  
         if (line.match(/^(\s*)- (?!\[)/)) {
             const indent = line.match(/^(\s*)/)[1].length;
-            const text = line.replace(/^(\s*)- /, '');
+            let text = line.replace(/^(\s*)- /, '');
             const marginLeft = indent * 12; // 12px per indent level
             
-            html += `<div class="training-item" data-line="${lineNumber}" data-type="item" style="margin-left: ${marginLeft}px;">
+            // Check if text is wrapped in strikethrough (skipped)
+            let isSkipped = false;
+            if (text.match(/^~~(.*)~~$/)) {
+                isSkipped = true;
+                text = text.replace(/^~~(.*)~~$/, '$1');
+            }
+            
+            // Extract note if present (text in [NOTE: ...] format at the end)
+            let noteText = '';
+            const noteMatch = text.match(/^(.*?)\s*\[NOTE:\s*([^\]]+)\]\s*$/);
+            if (noteMatch) {
+                text = noteMatch[1].trim();
+                noteText = noteMatch[2].trim();
+            }
+            
+            const noteDisplay = noteText ? 'block' : 'none';
+            const noteContent = noteText ? noteText : '';
+            const skippedClass = isSkipped ? ' skipped' : '';
+            const addNoteDisplay = noteText ? 'none' : 'none'; // Never show by default, controlled by actions
+            
+            html += `<div class="training-item${skippedClass}" data-line="${lineNumber}" data-type="item" style="margin-left: ${marginLeft}px;">
                 <div class="item-row">
                     <span class="item-bullet">•</span>
                     <span class="item-text" onclick="showItemActions(this)">${formatInlineMarkdown(text)}</span>
                 </div>
-                <div class="item-note" style="display: none; margin-left: 24px; margin-top: 4px; font-style: italic; color: #666; font-size: 14px;"></div>
-                <div class="add-note-prompt" style="display: none; margin-left: 24px; margin-top: 8px;">
+                <div class="item-note" style="display: ${noteDisplay}; margin-left: 24px; margin-top: 4px; font-style: italic; color: #666; font-size: 14px; cursor: pointer; padding: 4px; border-radius: 3px; background-color: #f8f9fa;" onclick="editNote(this)">${noteContent}</div>
+                <div class="add-note-prompt" style="display: ${addNoteDisplay}; margin-left: 24px; margin-top: 8px;">
                     <button class="add-note-btn" onclick="addNoteToItem(this)">+ Add note</button>
                 </div>
             </div>`;
             continue;
         }
         
-        // Handle regular paragraphs
-        const formatted = formatInlineMarkdown(line);
-        if (formatted || line.trim() === '') {
-            html += formatted || '<br>';
+        // Handle regular paragraphs (make them interactive)
+        if (line.trim()) {
+            // Check if text is wrapped in strikethrough (skipped)
+            let isSkipped = false;
+            let displayText = line;
+            if (line.match(/^~~(.*)~~$/)) {
+                isSkipped = true;
+                displayText = line.replace(/^~~(.*)~~$/, '$1');
+            }
+            
+            // Extract note if present
+            let noteText = '';
+            const noteMatch = displayText.match(/^(.*?)\s*\[NOTE:\s*([^\]]+)\]\s*$/);
+            if (noteMatch) {
+                displayText = noteMatch[1].trim();
+                noteText = noteMatch[2].trim();
+            }
+            
+            const noteDisplay = noteText ? 'block' : 'none';
+            const noteContent = noteText ? noteText : '';
+            const skippedClass = isSkipped ? ' skipped' : '';
+            
+            html += `<div class="training-item${skippedClass}" data-line="${lineNumber}" data-type="paragraph">
+                <p class="item-text" onclick="showItemActions(this)" style="margin: 0; padding: 2px 4px; border-radius: 3px; cursor: pointer; transition: background-color 0.2s;">${formatInlineMarkdown(displayText)}</p>
+                <div class="item-note" style="display: ${noteDisplay}; margin-left: 24px; margin-top: 4px; font-style: italic; color: #666; font-size: 14px; cursor: pointer; padding: 4px; border-radius: 3px; background-color: #f8f9fa;" onclick="editNote(this)">${noteContent}</div>
+                <div class="add-note-prompt" style="display: none; margin-left: 24px; margin-top: 8px;">
+                    <button class="add-note-btn" onclick="addNoteToItem(this)">+ Add note</button>
+                </div>
+            </div>`;
         }
     }
     
@@ -903,42 +1003,40 @@ function toggleCheckbox(checkbox) {
     const itemText = trainingItem.querySelector('.item-text');
     const lineNumber = trainingItem.getAttribute('data-line');
     
-    // Log the checkbox toggle
-    logFileChange('checkbox_toggle', {
-        lineNumber: lineNumber,
-        itemText: itemText.textContent,
-        checked: isChecked,
-        previousState: isChecked ? 'unchecked' : 'checked'
-    });
+    // Checkbox toggled
     
-    // Hide all existing add-note prompts
-    document.querySelectorAll('.add-note-prompt').forEach(prompt => {
-        prompt.style.display = 'none';
-    });
-    
-    if (isChecked) {
-        trainingItem.classList.remove('unchecked');
-        trainingItem.classList.add('checked');
-        
-        // Show add-note prompt for the most recently checked item
-        const notePrompt = trainingItem.querySelector('.add-note-prompt');
-        if (notePrompt) {
-            notePrompt.style.display = 'block';
+    // Edit the markdown directly
+    updateMarkdownLine(parseInt(lineNumber), (line) => {
+        if (isChecked) {
+            // Change unchecked to checked
+            return line.replace(/^(\s*)- \[ \] /, '$1- [x] ');
+        } else {
+            // Change checked to unchecked
+            return line.replace(/^(\s*)- \[x\] /, '$1- [ ] ');
         }
-    } else {
-        trainingItem.classList.remove('checked');
-        trainingItem.classList.add('unchecked');
-    }
+    });
     
-    // Save the change to the file
+    // Refresh the display and save
+    refreshMarkdownDisplay();
     saveTrainingDayChanges();
+    
+    // Action completed
 }
 
 function showItemActions(itemText) {
+    const trainingItem = itemText.closest('.training-item');
+    const lineNumber = trainingItem.dataset.line;
+    
+    // Check if menu is already showing for this item
+    const existingMenu = document.querySelector('.item-action-menu');
+    if (existingMenu && existingMenu.dataset.trainingItem === lineNumber) {
+        // Menu is already showing for this item, remove it
+        existingMenu.remove();
+        return;
+    }
+    
     // Remove any existing action menus
     document.querySelectorAll('.item-action-menu').forEach(menu => menu.remove());
-    
-    const trainingItem = itemText.closest('.training-item');
     const rect = itemText.getBoundingClientRect();
     const checkbox = trainingItem.querySelector('.item-checkbox');
     const isChecked = checkbox ? checkbox.checked : false;
@@ -956,13 +1054,42 @@ function showItemActions(itemText) {
     actionMenu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
     actionMenu.style.minWidth = '200px';
     
-    actionMenu.innerHTML = `
-        <div style="padding: 8px 16px; font-weight: 500; color: #666; border-bottom: 1px solid #eee; margin-bottom: 4px;">What would you like to do?</div>
-        <button onclick="markDone(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">✓ Mark Done</button>
-        <button onclick="doneWithNote(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">📝 Done with Note</button>
-        <button onclick="skipWithReason(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">⚠️ Skip with Reason</button>
-        <button onclick="editActivity(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">✏️ Edit Activity</button>
-    `;
+    // Check the current state of the item
+    const isSkipped = trainingItem.classList.contains('skipped');
+    const isDone = trainingItem.classList.contains('checked') || (checkbox && checkbox.checked);
+    const itemType = trainingItem.dataset.type;
+    const hasCheckbox = checkbox !== null || itemType === 'checkbox';
+    
+    // Build menu options based on item type
+    let menuHTML = '';
+    
+    // Only show done/undo for items with checkboxes
+    if (hasCheckbox) {
+        if (isDone) {
+            menuHTML += '<button onclick="undoItem(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">↶ undo</button>';
+        } else {
+            menuHTML += '<button onclick="markDone(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">✓ done</button>';
+        }
+    }
+    
+    // All items can be skipped/unskipped
+    if (isSkipped) {
+        menuHTML += '<button onclick="unskipItem(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">↩️ unskip</button>';
+    } else {
+        menuHTML += '<button onclick="skipItem(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">⏭️ skip</button>';
+    }
+    
+    // All items can have notes - check if note already exists
+    const noteElement = trainingItem.querySelector('.item-note');
+    const hasNote = noteElement && noteElement.style.display !== 'none' && noteElement.textContent.trim();
+    
+    if (hasNote) {
+        menuHTML += '<button onclick="editNoteFromMenu(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">📝 edit note</button>';
+    } else {
+        menuHTML += '<button onclick="addNote(this)" style="display: block; width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; font-size: 14px; color: #333;">📝 +note</button>';
+    }
+    
+    actionMenu.innerHTML = menuHTML;
     
     // Store reference to the training item
     actionMenu.dataset.trainingItem = trainingItem.dataset.line;
@@ -981,241 +1108,384 @@ function showItemActions(itemText) {
     }, 100);
 }
 
-// Quick add note function (for the + Add note button)
-function addNoteToItem(button) {
-    const trainingItem = button.closest('.training-item');
-    const noteSpan = trainingItem.querySelector('.item-note');
-    const notePrompt = trainingItem.querySelector('.add-note-prompt');
-    const itemText = trainingItem.querySelector('.item-text');
+// Note editing functions
+function editNote(noteElement) {
+    // Prevent event bubbling to avoid triggering item actions
+    event.stopPropagation();
+    
+    // Check if already editing
+    if (noteElement.querySelector('.note-editor')) return;
+    
+    const trainingItem = noteElement.closest('.training-item');
     const lineNumber = trainingItem.getAttribute('data-line');
+    const currentNoteText = noteElement.textContent.trim();
     
-    const newNote = prompt('Add a quick note:');
-    
-    if (newNote !== null && newNote.trim()) {
-        // Log the note addition
-        logFileChange('note_added', {
-            lineNumber: lineNumber,
-            itemText: itemText.textContent,
-            noteText: newNote,
-            method: 'quick_add_button'
-        });
-        
-        noteSpan.textContent = newNote;
-        noteSpan.style.display = 'block';
-        
-        // Hide the add note prompt
-        notePrompt.style.display = 'none';
-        
-        saveTrainingDayChanges();
-    }
+    // Create inline editing UI
+    createNoteEditor(noteElement, lineNumber, currentNoteText);
 }
 
-// Menu action functions
+function editNoteFromMenu(button) {
+    const menu = button.closest('.item-action-menu');
+    const lineNumber = menu.dataset.trainingItem;
+    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
+    const noteElement = trainingItem.querySelector('.item-note');
+    const currentNoteText = noteElement.textContent.trim();
+    
+    // Edit note action
+    menu.remove();
+    
+    // Check if already editing
+    if (noteElement.querySelector('.note-editor')) return;
+    
+    // Create inline editing UI
+    createNoteEditor(noteElement, lineNumber, currentNoteText);
+}
+
+function createNoteEditor(noteElement, lineNumber, currentText) {
+    // Hide the note text and create editor
+    noteElement.style.display = 'none';
+    
+    // Create editor container
+    const editorContainer = document.createElement('div');
+    editorContainer.className = 'note-editor';
+    editorContainer.style.cssText = `
+        margin-left: 24px;
+        margin-top: 4px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        background: white;
+        padding: 8px;
+        border: 2px solid #007AFF;
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    `;
+    
+    // Create input field
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentText;
+    input.placeholder = 'Add a note...';
+    input.style.cssText = `
+        flex: 1;
+        border: none;
+        outline: none;
+        font-size: 14px;
+        font-style: italic;
+        background: transparent;
+        color: #333;
+    `;
+    
+    // Create save button
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = '✓';
+    saveBtn.style.cssText = `
+        background: #007AFF;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    // Create cancel button
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '✕';
+    cancelBtn.style.cssText = `
+        background: #666;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    // Add delete button if note exists
+    let deleteBtn = null;
+    if (currentText) {
+        deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '🗑';
+        deleteBtn.style.cssText = `
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+    }
+    
+    // Assemble editor
+    editorContainer.appendChild(input);
+    editorContainer.appendChild(saveBtn);
+    editorContainer.appendChild(cancelBtn);
+    if (deleteBtn) editorContainer.appendChild(deleteBtn);
+    
+    // Insert editor after note element
+    noteElement.parentNode.insertBefore(editorContainer, noteElement.nextSibling);
+    
+    // Focus input and select text
+    input.focus();
+    input.select();
+    
+    // Event handlers
+    const saveNote = () => {
+        const newText = input.value.trim();
+        if (newText) {
+            updateNoteInMarkdown(lineNumber, newText);
+        } else if (currentText) {
+            removeNote(lineNumber);
+        }
+        cleanupEditor();
+    };
+    
+    const cancelEdit = () => {
+        cleanupEditor();
+    };
+    
+    const deleteNote = () => {
+        removeNote(lineNumber);
+        cleanupEditor();
+    };
+    
+    const cleanupEditor = () => {
+        editorContainer.remove();
+        noteElement.style.display = currentText ? 'block' : 'none';
+    };
+    
+    // Button events
+    saveBtn.addEventListener('click', saveNote);
+    cancelBtn.addEventListener('click', cancelEdit);
+    if (deleteBtn) deleteBtn.addEventListener('click', deleteNote);
+    
+    // Keyboard events
+    input.addEventListener('keydown', (e) => {
+        e.stopPropagation(); // Prevent triggering item actions
+        if (e.key === 'Enter') {
+            saveNote();
+        } else if (e.key === 'Escape') {
+            cancelEdit();
+        }
+    });
+    
+    // Click outside to cancel
+    setTimeout(() => {
+        const handleClickOutside = (e) => {
+            if (!editorContainer.contains(e.target)) {
+                cleanupEditor();
+                document.removeEventListener('click', handleClickOutside);
+            }
+        };
+        document.addEventListener('click', handleClickOutside);
+    }, 100);
+}
+
+function updateNoteInMarkdown(lineNumber, noteText) {
+    // Edit the markdown directly to update/add the note
+    updateMarkdownLine(parseInt(lineNumber), (line) => {
+        // Remove existing note if present
+        line = line.replace(/\s*\[NOTE:\s*[^\]]+\]\s*$/, '');
+        // Add new note
+        return line + ` [NOTE: ${noteText}]`;
+    });
+    
+    // Refresh the display and save
+    refreshMarkdownDisplay();
+    saveTrainingDayChanges();
+}
+
+function removeNote(lineNumber) {
+    // Edit the markdown directly to remove the note
+    updateMarkdownLine(parseInt(lineNumber), (line) => {
+        // Remove note if present
+        return line.replace(/\s*\[NOTE:\s*[^\]]+\]\s*$/, '');
+    });
+    
+    // Refresh the display and save
+    refreshMarkdownDisplay();
+    saveTrainingDayChanges();
+}
+
+// Quick add note function (for the + Add note button) - now unused
+function addNoteToItem(button) {
+    const trainingItem = button.closest('.training-item');
+    const noteElement = trainingItem.querySelector('.item-note');
+    const lineNumber = trainingItem.getAttribute('data-line');
+    
+    // Check if already editing
+    if (noteElement.querySelector('.note-editor')) return;
+    
+    // Create inline editing UI for new note
+    createNoteEditor(noteElement, lineNumber, '');
+}
+
+// Simplified menu action functions
 function markDone(button) {
     const menu = button.closest('.item-action-menu');
     const lineNumber = menu.dataset.trainingItem;
     const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
     const checkbox = trainingItem.querySelector('.item-checkbox');
     const itemText = trainingItem.querySelector('.item-text');
-    const wasSkipped = trainingItem.classList.contains('skipped');
     
-    // Log the mark done action
-    logFileChange('mark_done', {
-        lineNumber: lineNumber,
-        itemText: itemText.textContent,
-        method: 'menu_action',
-        wasSkipped: wasSkipped,
-        wasChecked: checkbox ? checkbox.checked : false
+    // Mark done action
+    
+    // Edit the markdown directly
+    updateMarkdownLine(parseInt(lineNumber), (line) => {
+        // Remove strikethrough if present
+        line = line.replace(/~~(.*?)~~/g, '$1');
+        
+        if (line.match(/^(\s*)- \[ \] /)) {
+            // Change unchecked to checked
+            return line.replace(/^(\s*)- \[ \] /, '$1- [x] ');
+        } else if (line.match(/^(\s*)- (?!\[)/)) {
+            // Convert regular item to checked checkbox
+            return line.replace(/^(\s*)- /, '$1- [x] ');
+        }
+        return line;
     });
     
-    // Remove skipped styling if present
-    if (itemText) {
-        // Remove strikethrough HTML tags
-        itemText.innerHTML = itemText.innerHTML.replace(/<del>(.*?)<\/del>/g, '$1');
-        itemText.style.textDecoration = 'none';
-        itemText.style.opacity = '';
-    }
-    trainingItem.classList.remove('skipped');
-    
-    if (checkbox && !checkbox.checked) {
-        checkbox.checked = true;
-        toggleCheckbox(checkbox);
-    }
-    
-    menu.remove();
-}
-
-function doneWithNote(button) {
-    const menu = button.closest('.item-action-menu');
-    const lineNumber = menu.dataset.trainingItem;
-    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
-    const checkbox = trainingItem.querySelector('.item-checkbox');
-    const noteSpan = trainingItem.querySelector('.item-note');
-    const itemText = trainingItem.querySelector('.item-text');
-    const wasSkipped = trainingItem.classList.contains('skipped');
-    
-    const newNote = prompt('Done! Add a note:');
-    
-    if (newNote !== null) {
-        // Log the done with note action
-        logFileChange('done_with_note', {
-            lineNumber: lineNumber,
-            itemText: itemText.textContent,
-            noteText: newNote.trim(),
-            method: 'menu_action',
-            wasSkipped: wasSkipped,
-            wasChecked: checkbox ? checkbox.checked : false
-        });
-        
-        // Remove skipped styling if present
-        if (itemText) {
-            // Remove strikethrough HTML tags
-            itemText.innerHTML = itemText.innerHTML.replace(/<del>(.*?)<\/del>/g, '$1');
-            itemText.style.textDecoration = 'none';
-            itemText.style.opacity = '';
-        }
-        trainingItem.classList.remove('skipped');
-        
-        // Mark as done
-        if (checkbox && !checkbox.checked) {
-            checkbox.checked = true;
-            trainingItem.classList.remove('unchecked');
-            trainingItem.classList.add('checked');
-        }
-        
-        // Add note if provided
-        if (newNote.trim()) {
-            noteSpan.textContent = newNote;
-            noteSpan.style.display = 'block';
-        }
-        
-        saveTrainingDayChanges();
-    }
-    
-    menu.remove();
-}
-
-function skipWithReason(button) {
-    const menu = button.closest('.item-action-menu');
-    const lineNumber = menu.dataset.trainingItem;
-    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
-    const checkbox = trainingItem.querySelector('.item-checkbox');
-    const noteSpan = trainingItem.querySelector('.item-note');
-    const itemText = trainingItem.querySelector('.item-text');
-    
-    const reason = prompt('Why are you skipping this?');
-    
-    if (reason !== null) {
-        // Log the skip action
-        logFileChange('skip_with_reason', {
-            lineNumber: lineNumber,
-            itemText: itemText.textContent,
-            reason: reason.trim(),
-            method: 'menu_action',
-            wasChecked: checkbox ? checkbox.checked : false
-        });
-        
-        // Ensure checkbox is unchecked
-        if (checkbox) {
-            checkbox.checked = false;
-            trainingItem.classList.remove('checked');
-            trainingItem.classList.add('unchecked');
-        }
-        
-        // Add strikethrough markdown to the item text
-        if (itemText) {
-            const currentText = itemText.innerHTML;
-            // Only add strikethrough if not already present
-            if (!currentText.includes('<del>')) {
-                // Wrap the current content in strikethrough
-                itemText.innerHTML = `<del>${currentText}</del>`;
-            }
-        }
-        
-        // Add skip reason if provided (formatted like a regular note)
-        if (reason.trim()) {
-            noteSpan.textContent = reason;
-            noteSpan.style.display = 'block';
-            noteSpan.style.color = '#666'; // Same color as regular notes
-        }
-        
-        // Mark the item as skipped for easy identification
-        trainingItem.classList.add('skipped');
-        
-        saveTrainingDayChanges();
-    }
-    
-    menu.remove();
-}
-
-function editActivity(button) {
-    const menu = button.closest('.item-action-menu');
-    const lineNumber = menu.dataset.trainingItem;
-    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
-    const itemText = trainingItem.querySelector('.item-text');
-    
-    const currentText = itemText.textContent;
-    const newText = prompt('Edit activity:', currentText);
-    
-    if (newText !== null && newText.trim() && newText !== currentText) {
-        // Log the edit action
-        logFileChange('edit_activity', {
-            lineNumber: lineNumber,
-            originalText: currentText,
-            newText: newText,
-            method: 'menu_action'
-        });
-        
-        itemText.textContent = newText;
-        
-        // Add a small edited indicator
-        let editedIndicator = trainingItem.querySelector('.edited-indicator');
-        if (!editedIndicator) {
-            editedIndicator = document.createElement('span');
-            editedIndicator.className = 'edited-indicator';
-            editedIndicator.textContent = ' (edited)';
-            editedIndicator.style.fontSize = '12px';
-            editedIndicator.style.color = '#999';
-            editedIndicator.style.fontStyle = 'italic';
-            itemText.appendChild(editedIndicator);
-        }
-        
-        saveTrainingDayChanges();
-    }
-    
-    menu.remove();
-}
-
-function toggleStrikethrough(button) {
-    const menu = button.closest('.item-action-menu');
-    const lineNumber = menu.dataset.trainingItem;
-    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
-    const itemText = trainingItem.querySelector('.item-text');
-    
-    if (itemText.style.textDecoration === 'line-through') {
-        itemText.style.textDecoration = 'none';
-        itemText.style.opacity = '1';
-    } else {
-        itemText.style.textDecoration = 'line-through';
-        itemText.style.opacity = '0.6';
-    }
-    
+    // Refresh the display and save
+    refreshMarkdownDisplay();
     saveTrainingDayChanges();
+    
+    // Action completed
+    
     menu.remove();
 }
 
-function removeItem(button) {
+function skipItem(button) {
     const menu = button.closest('.item-action-menu');
     const lineNumber = menu.dataset.trainingItem;
     const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
+    const itemText = trainingItem.querySelector('.item-text');
     
-    if (confirm('Remove this item?')) {
-        trainingItem.remove();
-        saveTrainingDayChanges();
-    }
+    // Skip item action
+    
+    // Edit the markdown directly
+    updateMarkdownLine(parseInt(lineNumber), (line) => {
+        // Uncheck any checkboxes and add strikethrough
+        if (line.match(/^(\s*)- \[x\] /)) {
+            // Change checked to unchecked and add strikethrough
+            return line.replace(/^(\s*)- \[x\] (.*)/, '$1- [ ] ~~$2~~');
+        } else if (line.match(/^(\s*)- \[ \] /)) {
+            // Add strikethrough to unchecked
+            return line.replace(/^(\s*)- \[ \] (.*)/, '$1- [ ] ~~$2~~');
+        } else if (line.match(/^(\s*)- (?!\[)/)) {
+            // Add strikethrough to regular item
+            return line.replace(/^(\s*)- (.*)/, '$1- ~~$2~~');
+        } else if (line.match(/^# /)) {
+            // Add strikethrough to heading 1
+            return line.replace(/^# (.*)/, '# ~~$1~~');
+        } else if (line.match(/^## /)) {
+            // Add strikethrough to heading 2
+            return line.replace(/^## (.*)/, '## ~~$1~~');
+        } else if (line.match(/^### /)) {
+            // Add strikethrough to heading 3
+            return line.replace(/^### (.*)/, '### ~~$1~~');
+        } else {
+            // Add strikethrough to regular paragraph
+            return `~~${line}~~`;
+        }
+    });
+    
+    // Refresh the display and save
+    refreshMarkdownDisplay();
+    saveTrainingDayChanges();
+    
+    // Action completed
     
     menu.remove();
 }
+
+function unskipItem(button) {
+    const menu = button.closest('.item-action-menu');
+    const lineNumber = menu.dataset.trainingItem;
+    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
+    const itemText = trainingItem.querySelector('.item-text');
+    
+    // Unskip item action
+    
+    // Edit the markdown directly to remove strikethrough
+    updateMarkdownLine(parseInt(lineNumber), (line) => {
+        // Remove strikethrough markers
+        return line.replace(/~~(.*?)~~/g, '$1');
+    });
+    
+    // Refresh the display and save
+    refreshMarkdownDisplay();
+    saveTrainingDayChanges();
+    
+    // Action completed
+    
+    menu.remove();
+}
+
+function undoItem(button) {
+    const menu = button.closest('.item-action-menu');
+    const lineNumber = menu.dataset.trainingItem;
+    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
+    const checkbox = trainingItem.querySelector('.item-checkbox');
+    const itemText = trainingItem.querySelector('.item-text');
+    
+    // Undo item action
+    
+    // Edit the markdown directly to undo the action
+    updateMarkdownLine(parseInt(lineNumber), (line) => {
+        if (line.match(/^(\s*)- \[x\] /)) {
+            // Change checked to unchecked
+            return line.replace(/^(\s*)- \[x\] /, '$1- [ ] ');
+        } else if (checkbox) {
+            // If there was already a checkbox, just uncheck it
+            return line.replace(/^(\s*)- \[x\] /, '$1- [ ] ');
+        } else {
+            // Convert back from checkbox to regular item
+            return line.replace(/^(\s*)- \[x\] (.*)/, '$1- $2');
+        }
+    });
+    
+    // Refresh the display and save
+    refreshMarkdownDisplay();
+    saveTrainingDayChanges();
+    
+    // Action completed
+    
+    menu.remove();
+}
+
+function addNote(button) {
+    const menu = button.closest('.item-action-menu');
+    const lineNumber = menu.dataset.trainingItem;
+    const trainingItem = document.querySelector(`[data-line="${lineNumber}"]`);
+    const noteElement = trainingItem.querySelector('.item-note');
+    
+    // Add note action
+    menu.remove();
+    
+    // Check if already editing
+    if (noteElement.querySelector('.note-editor')) return;
+    
+    // Create inline editing UI for new note
+    createNoteEditor(noteElement, lineNumber, '');
+}
+
+// Removed complex +item functionality for simplicity
+
+// Old functions removed - using simplified 4-option menu now
 
 function showAddItemForm() {
     const form = document.querySelector('.add-item-form');
@@ -1269,31 +1539,41 @@ function addNewItem() {
     saveTrainingDayChanges();
 }
 
+// Store the original markdown content for direct editing
+let originalMarkdownContent = '';
+
+// Helper functions for direct markdown editing
+function updateMarkdownLine(lineNumber, transformFunction) {
+    const lines = originalMarkdownContent.split('\n');
+    if (lineNumber > 0 && lineNumber <= lines.length) {
+        lines[lineNumber - 1] = transformFunction(lines[lineNumber - 1]);
+        originalMarkdownContent = lines.join('\n');
+    }
+}
+
+function refreshMarkdownDisplay() {
+    const contentDiv = document.getElementById('fileContent');
+    contentDiv.innerHTML = formatMarkdown(originalMarkdownContent);
+}
+
 async function saveTrainingDayChanges() {
     if (!currentFileId) return;
     
     try {
-        // Extract current content from the DOM
-        const fileContent = document.getElementById('fileContent');
-        const updatedContent = extractMarkdownFromDOM(fileContent);
+        // Use the directly edited markdown content instead of DOM extraction
+        const updatedContent = originalMarkdownContent;
         
-        // Log the save action
-        logFileChange('file_saved', {
-            fileName: document.getElementById('fileTitle').textContent,
-            contentLength: updatedContent.length,
-            totalChanges: fileChangeLog.length - 1 // Subtract 1 for the file_opened entry
-        });
+        // File saved
         
-        // Save to backend with change log
+        // Save to backend
         await apiCall(`${API_BASE}/coach/files/${document.getElementById('fileTitle').textContent}`, {
             method: 'PUT',
             body: JSON.stringify({
-                content: updatedContent,
-                changeLog: fileChangeLog // Include the change log
+                content: updatedContent
             })
         });
         
-        console.log('Training day changes saved with change log:', fileChangeLog);
+        console.log('Training day changes saved');
     } catch (error) {
         console.error('Failed to save training day changes:', error);
     }
@@ -1314,12 +1594,27 @@ function extractMarkdownFromDOM(container) {
             const itemNote = element.querySelector('.item-note');
             const checkbox = element.querySelector('.item-checkbox');
             
-            let line = '';
+            // Calculate indentation from marginLeft style - with safety caps
+            const marginLeft = element.style.marginLeft || '0px';
+            const marginPixels = parseInt(marginLeft.replace('px', '')) || 0;
+            let indentLevel = Math.floor(marginPixels / 12); // 12px per indent level
+            
+            // Safety cap: never allow more than 4 levels of indentation
+            indentLevel = Math.min(indentLevel, 4);
+            
+            const indentSpaces = '  '.repeat(indentLevel); // 2 spaces per indent level
+            
+            // Debug if we're seeing crazy values
+            if (marginPixels > 48) {
+                console.warn(`Excessive indentation detected: ${marginLeft} (${marginPixels}px) for element:`, element);
+            }
+            
+            let line = indentSpaces;
             
             if (checkbox) {
-                line = checkbox.checked ? '- [x] ' : '- [ ] ';
+                line += checkbox.checked ? '- [x] ' : '- [ ] ';
             } else {
-                line = '- ';
+                line += '- ';
             }
             
             // Convert HTML back to markdown
@@ -1336,27 +1631,26 @@ function extractMarkdownFromDOM(container) {
             line += tempDiv.textContent || tempDiv.innerText;
             
             if (itemNote && itemNote.style.display !== 'none' && itemNote.textContent) {
-                // Extract note text (remove parentheses)
-                const noteText = itemNote.textContent.replace(/^\s*\(|\)\s*$/g, '');
-                line += ` (${noteText})`;
+                // Extract note text and format as [NOTE: ...]
+                const noteText = itemNote.textContent.trim();
+                line += ` [NOTE: ${noteText}]`;
             }
             
             markdown += line + '\n';
         } else if (element.classList.contains('add-item-section')) {
             // Skip the add item section
             continue;
-        } else if (element.tagName === 'BR') {
-            markdown += '\n';
-        } else {
-            // Handle other content
-            markdown += element.textContent + '\n';
+        } else if (element.textContent && element.textContent.trim()) {
+            // Handle other content - only add if it has actual content
+            markdown += element.textContent.trim() + '\n';
         }
+        // Skip <br> tags entirely - they're not needed in clean markdown
     }
     
     return markdown.trim();
 }
 
-// Debug functions for viewing raw markdown and changelog
+// Debug functions for viewing raw markdown
 function toggleRawView() {
     if (!currentFileData) return;
     
@@ -1365,22 +1659,17 @@ function toggleRawView() {
     const fileName = document.getElementById('fileTitle').textContent;
     
     if (isRawView) {
-        // Switch back to formatted view
-        if (fileName.trim().endsWith('.md') || fileName.trim().endsWith('.markdown')) {
-            contentDiv.className = 'file-content markdown';
-            contentDiv.innerHTML = formatMarkdown(currentFileData.content);
-            contentDiv.style.backgroundColor = '';
-            contentDiv.style.border = '';
-        } else if (fileName.endsWith('.json')) {
-            contentDiv.className = 'file-content';
-            contentDiv.textContent = JSON.stringify(currentFileData.content, null, 2);
-        } else {
-            contentDiv.className = 'file-content';
-            contentDiv.textContent = currentFileData.content;
-        }
-        rawBtn.textContent = '📄 Raw';
-        rawBtn.style.backgroundColor = '#6c757d';
-        isRawView = false;
+        // Switch back to formatted view - reset all inline styles first
+        contentDiv.style.whiteSpace = '';
+        contentDiv.style.fontFamily = '';
+        contentDiv.style.fontSize = '';
+        contentDiv.style.backgroundColor = '';
+        contentDiv.style.border = '';
+        
+        // Then reload the file to get fresh content
+        const fileName = document.getElementById('fileTitle').textContent;
+        loadFile(currentFileId, fileName);
+        return; // loadFile will handle the rest
     } else {
         // Switch to raw view
         contentDiv.className = 'file-content';
@@ -1398,48 +1687,4 @@ function toggleRawView() {
     }
 }
 
-async function viewChangelog() {
-    if (!currentFileData) return;
-    
-    const fileName = document.getElementById('fileTitle').textContent;
-    const changelogFileName = `${fileName}.changelog`;
-    
-    try {
-        // Try to load the changelog file
-        const result = await apiCall(`${API_BASE}/coach/files/${changelogFileName}`);
-        
-        // Store current state
-        const originalFileData = currentFileData;
-        const originalFileName = fileName;
-        
-        // Load changelog as if it's a regular file
-        currentFileData = result;
-        isRawView = false;
-        
-        document.getElementById('fileTitle').textContent = changelogFileName;
-        document.getElementById('fileSubtitle').textContent = 
-            `Change log for ${originalFileName} • Read-only`;
-        
-        const contentDiv = document.getElementById('fileContent');
-        contentDiv.className = 'file-content markdown';
-        contentDiv.innerHTML = formatMarkdown(result.content);
-        contentDiv.style.backgroundColor = '#f9f9fa';
-        contentDiv.style.border = '2px solid #e9ecef';
-        
-        // Update button text to show we can go back
-        const changelogBtn = document.getElementById('viewChangelogBtn');
-        changelogBtn.textContent = '← Back to File';
-        changelogBtn.onclick = () => {
-            // Restore original file
-            currentFileData = originalFileData;
-            loadFile(currentFileId, originalFileName);
-        };
-        
-    } catch (error) {
-        if (error.message.includes('File not found')) {
-            showError(`No changelog found for ${fileName}. Changes will be logged when you interact with the file.`);
-        } else {
-            showError('Failed to load changelog: ' + error.message);
-        }
-    }
-}
+// Changelog functionality removed
