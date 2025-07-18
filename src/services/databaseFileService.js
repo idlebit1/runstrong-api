@@ -3,10 +3,17 @@ const prisma = require('../lib/database');
 class DatabaseFileService {
   async writeFile(userId, fileName, content) {
     try {
+      // Sanitize filename - remove leading/trailing whitespace
+      const sanitizedFileName = fileName.trim();
+      
+      if (!sanitizedFileName) {
+        throw new Error('Invalid filename: cannot be empty or only whitespace');
+      }
+      
       // No need to upsert user - user already exists from JWT authentication
       
       // Determine file type based on extension
-      const fileType = this._getFileType(fileName);
+      const fileType = this._getFileType(sanitizedFileName);
       
       // Ensure content is string
       const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
@@ -15,7 +22,7 @@ class DatabaseFileService {
         where: {
           userId_fileName: {
             userId,
-            fileName
+            fileName: sanitizedFileName
           }
         },
         update: {
@@ -25,7 +32,7 @@ class DatabaseFileService {
         },
         create: {
           userId,
-          fileName,
+          fileName: sanitizedFileName,
           content: contentStr,
           fileType
         }
@@ -46,11 +53,14 @@ class DatabaseFileService {
 
   async readFile(userId, fileName) {
     try {
+      // Sanitize filename - remove leading/trailing whitespace
+      const sanitizedFileName = fileName.trim();
+      
       const file = await prisma.userFile.findUnique({
         where: {
           userId_fileName: {
             userId,
-            fileName
+            fileName: sanitizedFileName
           }
         }
       });
@@ -69,7 +79,7 @@ class DatabaseFileService {
           content = JSON.parse(file.content);
         } catch (e) {
           // If parsing fails, return as string
-          console.warn(`Failed to parse JSON file ${fileName}:`, e);
+          console.warn(`Failed to parse JSON file ${sanitizedFileName}:`, e);
         }
       }
 
@@ -214,6 +224,40 @@ class DatabaseFileService {
     };
   }
 
+  _formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  _isDirectoryPath(filePath) {
+    // Handle common directory indicators
+    if (filePath === '.' || filePath === './' || filePath === '') {
+      return true;
+    }
+    
+    // Handle root directory
+    if (filePath === '/' || filePath === '\\') {
+      return true;
+    }
+    
+    // Handle paths ending with directory separators
+    if (filePath.endsWith('/') || filePath.endsWith('\\')) {
+      return true;
+    }
+    
+    // Handle paths that look like directories (no file extension)
+    // This is a heuristic - if there's no dot in the last path segment, treat as directory
+    const lastSegment = filePath.split(/[/\\]/).pop();
+    if (lastSegment && !lastSegment.includes('.')) {
+      return true;
+    }
+    
+    return false;
+  }
+
   // Text Editor Handler Integration
   async handleTextEditorOperation(userId, operation) {
     try {
@@ -240,6 +284,31 @@ class DatabaseFileService {
   }
 
   async _handleView(userId, filePath, viewRange) {
+    // Handle directory listing
+    if (this._isDirectoryPath(filePath)) {
+      const result = await this.listFiles(userId);
+      if (!result.success) {
+        return 'ERROR: Could not list files';
+      }
+      
+      if (result.files.length === 0) {
+        return `📁 Directory ${filePath} is empty. This appears to be our first conversation!`;
+      }
+      
+      let output = `📁 Directory contents for ${filePath}:\n\n`;
+      result.files.forEach(file => {
+        const isChangeLog = file.fileName.endsWith('.changelog');
+        const icon = isChangeLog ? '📊' : (file.fileType === 'json' ? '📄' : '📝');
+        const size = this._formatFileSize(file.size);
+        const date = new Date(file.updatedAt).toLocaleDateString();
+        const readOnly = isChangeLog ? ' (read-only)' : '';
+        output += `${icon} ${file.fileName} - ${size} - ${date}${readOnly}\n`;
+      });
+      
+      return output;
+    }
+    
+    // Handle individual file viewing
     const result = await this.readFile(userId, filePath);
     
     if (!result.success) {

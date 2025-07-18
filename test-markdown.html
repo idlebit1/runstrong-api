@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Formatting Tests</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-case {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .test-header {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-bottom: 1px solid #ddd;
+            font-weight: bold;
+            color: #333;
+        }
+        .test-input {
+            background: #f8f8f8;
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            color: #666;
+        }
+        .test-output {
+            padding: 15px;
+            min-height: 50px;
+        }
+        .test-result {
+            padding: 10px 15px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .test-pass {
+            background: #d4edda;
+            color: #155724;
+        }
+        .test-fail {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .test-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        /* Training day styles (copied from main app) */
+        .training-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .item-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .training-item:hover {
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            margin: 0 -4px;
+            padding: 8px 4px;
+        }
+        .item-checkbox {
+            margin-top: 2px;
+            cursor: pointer;
+        }
+        .item-bullet {
+            color: #666;
+            margin-top: 2px;
+        }
+        .item-text {
+            flex: 1;
+            cursor: pointer;
+            user-select: none;
+            padding: 2px 4px;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+        }
+        .item-text:hover {
+            background-color: #e3f2fd;
+        }
+        .training-item.checked .item-text {
+            opacity: 0.7;
+        }
+        .training-item.skipped .item-text {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+        
+        .run-tests-btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+        .run-tests-btn:hover {
+            background: #0056d3;
+        }
+    </style>
+</head>
+<body>
+    <h1>📝 Markdown Formatting Unit Tests</h1>
+    <p>Tests for the <code>formatMarkdown</code> function to ensure proper conversion of various markdown patterns to interactive training elements.</p>
+    
+    <button class="run-tests-btn" onclick="runAllTests()">🚀 Run All Tests</button>
+    
+    <div id="test-results"></div>
+
+    <script>
+        // Copy the formatMarkdown and formatInlineMarkdown functions from app.js
+        function formatInlineMarkdown(text) {
+            return text
+                .replace(/~~(.*?)~~/g, '<del>$1</del>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+        }
+
+        function formatMarkdown(content) {
+            const lines = content.split('\n');
+            let html = '';
+            let lineNumber = 0;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                lineNumber++;
+                
+                // Handle headers
+                if (line.match(/^# /)) {
+                    html += `<h1>${formatInlineMarkdown(line.replace(/^# /, ''))}</h1>`;
+                    continue;
+                }
+                if (line.match(/^## /)) {
+                    html += `<h2>${formatInlineMarkdown(line.replace(/^## /, ''))}</h2>`;
+                    continue;
+                }
+                if (line.match(/^### /)) {
+                    html += `<h3>${formatInlineMarkdown(line.replace(/^### /, ''))}</h3>`;
+                    continue;
+                }
+                
+                // Handle any level of indented checkboxes (make them ALL interactive)
+                if (line.match(/^(\s*)- \[(?:x| )\] /)) {
+                    const indent = line.match(/^(\s*)/)[1].length;
+                    const isChecked = line.match(/^(\s*)- \[x\] /) ? 'true' : 'false';
+                    const text = line.replace(/^(\s*)- \[(?:x| )\] /, '');
+                    const checked = isChecked === 'true';
+                    const checkedClass = checked ? 'checked' : 'unchecked';
+                    const checkedAttr = checked ? 'checked' : '';
+                    const marginLeft = indent * 12; // 12px per indent level
+                    
+                    html += `<div class="training-item ${checkedClass}" data-line="${lineNumber}" data-type="checkbox" style="margin-left: ${marginLeft}px;">
+                        <div class="item-row">
+                            <input type="checkbox" class="item-checkbox" ${checkedAttr} onchange="toggleCheckbox(this)"> 
+                            <span class="item-text" onclick="showItemActions(this)">${formatInlineMarkdown(text)}</span>
+                        </div>
+                        <div class="item-note" style="display: none; margin-left: 24px; margin-top: 4px; font-style: italic; color: #666; font-size: 14px;"></div>
+                        <div class="add-note-prompt" style="display: none; margin-left: 24px; margin-top: 8px;">
+                            <button class="add-note-btn" onclick="addNoteToItem(this)">+ Add note</button>
+                        </div>
+                    </div>`;
+                    continue;
+                }
+                
+                // Handle any level of indented regular list items (make them ALL interactive)  
+                if (line.match(/^(\s*)- (?!\[)/)) {
+                    const indent = line.match(/^(\s*)/)[1].length;
+                    const text = line.replace(/^(\s*)- /, '');
+                    const marginLeft = indent * 12; // 12px per indent level
+                    
+                    html += `<div class="training-item" data-line="${lineNumber}" data-type="item" style="margin-left: ${marginLeft}px;">
+                        <div class="item-row">
+                            <span class="item-bullet">•</span>
+                            <span class="item-text" onclick="showItemActions(this)">${formatInlineMarkdown(text)}</span>
+                        </div>
+                        <div class="item-note" style="display: none; margin-left: 24px; margin-top: 4px; font-style: italic; color: #666; font-size: 14px;"></div>
+                        <div class="add-note-prompt" style="display: none; margin-left: 24px; margin-top: 8px;">
+                            <button class="add-note-btn" onclick="addNoteToItem(this)">+ Add note</button>
+                        </div>
+                    </div>`;
+                    continue;
+                }
+                
+                // Handle regular paragraphs
+                const formatted = formatInlineMarkdown(line);
+                if (formatted || line.trim() === '') {
+                    html += formatted || '<br>';
+                }
+            }
+            
+            return html;
+        }
+
+        // Stub functions for testing (these don't need to work, just exist)
+        function toggleCheckbox() {}
+        function showItemActions() {}
+        function addNoteToItem() {}
+
+        // Test cases
+        const testCases = [
+            {
+                name: "Simple Checkbox Items",
+                input: `- [ ] First unchecked item
+- [x] Second checked item
+- [ ] Third unchecked item`,
+                expectations: [
+                    { type: "contains", value: 'type="checkbox"', count: 3 },
+                    { type: "contains", value: 'checked', count: 1 },
+                    { type: "contains", value: 'data-type="checkbox"', count: 3 },
+                    { type: "contains", value: 'First unchecked item', count: 1 },
+                    { type: "contains", value: 'Second checked item', count: 1 }
+                ]
+            },
+            {
+                name: "Simple List Items", 
+                input: `- First regular item
+- Second regular item
+- Third regular item`,
+                expectations: [
+                    { type: "contains", value: 'data-type="item"', count: 3 },
+                    { type: "contains", value: 'item-bullet', count: 3 },
+                    { type: "contains", value: 'First regular item', count: 1 },
+                    { type: "contains", value: 'Second regular item', count: 1 }
+                ]
+            },
+            {
+                name: "Complex Nested Structure (Original Problem Case)",
+                input: `## Run
+- [ ] **Easy Run** - 5 miles at conversational pace (7:30-8:00/mile)
+  - Focus on relaxed form, especially left hip alignment
+  - Check in with glute engagement every 10 minutes
+  - [ ] **Post-Run Strides** (after easy miles)
+    - 4 x 100m strides at 5k effort (~5:30/mile pace)
+    - Full recovery between each
+    - Focus on smooth turnover, not forcing speed`,
+                expectations: [
+                    { type: "contains", value: '<h2>Run</h2>', count: 1 },
+                    { type: "contains", value: 'data-type="checkbox"', count: 2 },
+                    { type: "contains", value: 'data-type="item"', count: 5 },
+                    { type: "contains", value: 'margin-left: 24px', count: 2 }, // 2-space indent
+                    { type: "contains", value: 'margin-left: 48px', count: 3 }, // 4-space indent
+                    { type: "contains", value: '<strong>Easy Run</strong>', count: 1 },
+                    { type: "contains", value: '<strong>Post-Run Strides</strong>', count: 1 }
+                ]
+            },
+            {
+                name: "Headers with Markdown Formatting",
+                input: `# Main **Title** with *emphasis*
+## Subtitle with `code`
+### Level 3 with ~~strikethrough~~`,
+                expectations: [
+                    { type: "contains", value: '<h1>Main <strong>Title</strong> with <em>emphasis</em></h1>', count: 1 },
+                    { type: "contains", value: '<h2>Subtitle with <code>code</code></h2>', count: 1 },
+                    { type: "contains", value: '<h3>Level 3 with <del>strikethrough</del></h3>', count: 1 }
+                ]
+            },
+            {
+                name: "Mixed Indentation Levels",
+                input: `- Level 0 item
+  - Level 1 item  
+    - Level 2 item
+      - Level 3 item
+        - Level 4 item`,
+                expectations: [
+                    { type: "contains", value: 'margin-left: 0px', count: 1 },
+                    { type: "contains", value: 'margin-left: 24px', count: 1 },
+                    { type: "contains", value: 'margin-left: 48px', count: 1 },
+                    { type: "contains", value: 'margin-left: 72px', count: 1 },
+                    { type: "contains", value: 'margin-left: 96px', count: 1 },
+                    { type: "contains", value: 'data-type="item"', count: 5 }
+                ]
+            },
+            {
+                name: "Checkboxes at Different Indentation Levels",
+                input: `- [ ] Level 0 checkbox
+  - [ ] Level 1 checkbox  
+    - [ ] Level 2 checkbox
+      - [x] Level 3 checked`,
+                expectations: [
+                    { type: "contains", value: 'data-type="checkbox"', count: 4 },
+                    { type: "contains", value: 'margin-left: 0px', count: 1 },
+                    { type: "contains", value: 'margin-left: 24px', count: 1 },
+                    { type: "contains", value: 'margin-left: 48px', count: 1 },
+                    { type: "contains", value: 'margin-left: 72px', count: 1 },
+                    { type: "contains", value: 'checked', count: 1 }
+                ]
+            },
+            {
+                name: "Inline Markdown in List Items",
+                input: `- [ ] **Bold** and *italic* text with \`code\`
+- Regular item with [link](http://example.com)
+- ~~Strikethrough~~ text item`,
+                expectations: [
+                    { type: "contains", value: '<strong>Bold</strong>', count: 1 },
+                    { type: "contains", value: '<em>italic</em>', count: 1 },
+                    { type: "contains", value: '<code>code</code>', count: 1 },
+                    { type: "contains", value: '<a href="http://example.com">link</a>', count: 1 },
+                    { type: "contains", value: '<del>Strikethrough</del>', count: 1 }
+                ]
+            },
+            {
+                name: "Empty Lines and Spacing",
+                input: `- [ ] First item
+
+- [ ] Item after empty line
+
+  - Indented item after empty line
+- [ ] Final item`,
+                expectations: [
+                    { type: "contains", value: 'data-type="checkbox"', count: 3 },
+                    { type: "contains", value: 'data-type="item"', count: 1 },
+                    { type: "contains", value: '<br>', count: 2 }
+                ]
+            },
+            {
+                name: "No List Items (Plain Text)",
+                input: `This is just regular text.
+No list items here.
+Just paragraphs.`,
+                expectations: [
+                    { type: "not_contains", value: 'training-item' },
+                    { type: "not_contains", value: 'data-type' },
+                    { type: "contains", value: 'This is just regular text.', count: 1 }
+                ]
+            },
+            {
+                name: "Edge Case: Checkbox-like Text (Not Actually Checkboxes)",
+                input: `This line has - [ ] but not at start
+And this - [x] is also not a checkbox
+- But this [ ] is missing the checkbox syntax
+- And this [y] has wrong checkbox syntax`,
+                expectations: [
+                    { type: "not_contains", value: 'data-type="checkbox"' },
+                    { type: "contains", value: 'data-type="item"', count: 2 },
+                    { type: "contains", value: 'This line has - [ ] but not at start', count: 1 }
+                ]
+            }
+        ];
+
+        function runTest(testCase) {
+            console.log(`\n=== Running test: ${testCase.name} ===`);
+            
+            const result = {
+                name: testCase.name,
+                passed: true,
+                errors: [],
+                output: ''
+            };
+
+            try {
+                const output = formatMarkdown(testCase.input);
+                result.output = output;
+                
+                // Run expectations
+                for (const expectation of testCase.expectations) {
+                    const success = checkExpectation(output, expectation);
+                    if (!success.passed) {
+                        result.passed = false;
+                        result.errors.push(success.error);
+                    }
+                }
+                
+            } catch (error) {
+                result.passed = false;
+                result.errors.push(`Exception thrown: ${error.message}`);
+            }
+
+            return result;
+        }
+
+        function checkExpectation(output, expectation) {
+            switch (expectation.type) {
+                case 'contains':
+                    const actualCount = (output.match(new RegExp(escapeRegex(expectation.value), 'g')) || []).length;
+                    const expectedCount = expectation.count || 1;
+                    if (actualCount !== expectedCount) {
+                        return {
+                            passed: false,
+                            error: `Expected "${expectation.value}" to appear ${expectedCount} time(s), but found ${actualCount}`
+                        };
+                    }
+                    break;
+                
+                case 'not_contains':
+                    if (output.includes(expectation.value)) {
+                        return {
+                            passed: false,
+                            error: `Expected "${expectation.value}" to NOT be present, but it was found`
+                        };
+                    }
+                    break;
+                
+                default:
+                    return {
+                        passed: false,
+                        error: `Unknown expectation type: ${expectation.type}`
+                    };
+            }
+            
+            return { passed: true };
+        }
+
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function renderTestResult(result) {
+            const statusClass = result.passed ? 'test-pass' : 'test-fail';
+            const statusText = result.passed ? '✅ PASS' : '❌ FAIL';
+            
+            return `
+                <div class="test-case">
+                    <div class="test-header">${result.name}</div>
+                    <div class="test-result ${statusClass}">${statusText}</div>
+                    ${result.errors.length > 0 ? `
+                        <div class="test-result test-fail">
+                            <strong>Errors:</strong><br>
+                            ${result.errors.map(error => `• ${error}`).join('<br>')}
+                        </div>
+                    ` : ''}
+                    <div class="test-input">${testCases.find(tc => tc.name === result.name).input}</div>
+                    <div class="test-output">${result.output}</div>
+                </div>
+            `;
+        }
+
+        function runAllTests() {
+            console.log('🚀 Running all markdown formatting tests...');
+            
+            const results = testCases.map(runTest);
+            const passCount = results.filter(r => r.passed).length;
+            const totalCount = results.length;
+            
+            const summaryClass = passCount === totalCount ? 'test-pass' : 'test-fail';
+            const summaryText = `${passCount}/${totalCount} tests passed`;
+            
+            const html = `
+                <div class="test-container">
+                    <div class="test-result ${summaryClass}">
+                        <h2>📊 Test Results: ${summaryText}</h2>
+                    </div>
+                </div>
+                ${results.map(renderTestResult).join('')}
+            `;
+            
+            document.getElementById('test-results').innerHTML = html;
+            
+            console.log(`\n📊 Final Results: ${summaryText}`);
+            if (passCount === totalCount) {
+                console.log('🎉 All tests passed!');
+            } else {
+                console.log('❌ Some tests failed. Check the details above.');
+            }
+        }
+
+        // Auto-run tests when page loads
+        window.addEventListener('DOMContentLoaded', runAllTests);
+    </script>
+</body>
+</html>

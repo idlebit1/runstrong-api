@@ -206,6 +206,16 @@
             font-size: 12px;
             color: #666;
         }
+        
+        .changelog-file {
+            background-color: #f8f9fa;
+            border-left: 3px solid #6c757d;
+        }
+        
+        .changelog-file .file-name {
+            color: #495057;
+            font-style: italic;
+        }
         .file-viewer {
             flex: 1;
             background: white;
@@ -220,6 +230,23 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+        }
+        .file-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .debug-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .debug-btn:hover {
+            background: #5a6268;
         }
         .file-content {
             flex: 1;
@@ -661,7 +688,9 @@
                     <h2 id="fileTitle">Select a file</h2>
                     <small id="fileSubtitle">Choose a file from the sidebar to view its contents</small>
                 </div>
-                <div>
+                <div class="file-actions">
+                    <button id="viewRawBtn" class="debug-btn" style="display: none;" onclick="toggleRawView()">📄 Raw</button>
+                    <button id="viewChangelogBtn" class="debug-btn" style="display: none;" onclick="viewChangelog()">📊 Changelog</button>
                     <button id="backToChatBtn">← Back to Chat</button>
                 </div>
             </div>

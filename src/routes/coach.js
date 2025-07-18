@@ -283,7 +283,8 @@ router.post('/files/:fileName', async (req, res) => {
 
 router.get('/files/:fileName', async (req, res) => {
   try {
-    const { fileName } = req.params;
+    const { fileName: rawFileName } = req.params;
+    const fileName = rawFileName.trim(); // Remove leading/trailing whitespace
     const userId = req.user.userId;
     
     const result = await databaseFileService.readFile(userId, fileName);
@@ -292,7 +293,14 @@ router.get('/files/:fileName', async (req, res) => {
       return res.status(404).json({ error: result.error });
     }
     
-    res.json({ content: result.content });
+    // Add metadata for changelog files
+    let responseData = { content: result.content };
+    if (fileName.endsWith('.changelog')) {
+      responseData.readOnly = true;
+      responseData.isChangeLog = true;
+    }
+    
+    res.json(responseData);
   } catch (error) {
     console.error('File read endpoint error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -301,8 +309,14 @@ router.get('/files/:fileName', async (req, res) => {
 
 router.put('/files/:fileName', async (req, res) => {
   try {
-    const { fileName } = req.params;
-    const { content } = req.body;
+    const { fileName: rawFileName } = req.params;
+    const fileName = rawFileName.trim(); // Remove leading/trailing whitespace
+    const { content, changeLog } = req.body;
+    
+    // Prevent writing to changelog files
+    if (fileName.endsWith('.changelog')) {
+      return res.status(403).json({ error: 'Changelog files are read-only' });
+    }
     
     if (!content) {
       return res.status(400).json({ error: 'Content is required' });
@@ -315,12 +329,76 @@ router.put('/files/:fileName', async (req, res) => {
       return res.status(500).json({ error: result.error });
     }
     
+    // If changeLog is provided, store it as a separate record
+    if (changeLog && Array.isArray(changeLog)) {
+      const changeLogFileName = `${fileName}.changelog`;
+      const changeLogContent = formatChangeLogAsText(changeLog);
+      await databaseFileService.writeFile(userIdToUse, changeLogFileName, changeLogContent);
+    }
+    
     res.json({ success: true, message: 'File updated successfully' });
   } catch (error) {
     console.error('File update endpoint error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Helper function to format change log as readable text
+function formatChangeLogAsText(changeLog) {
+  let text = `# Change Log\n\nThis file tracks all user interactions and modifications.\n\n`;
+  
+  // Add summary
+  const summary = generateSummaryFromChangeLog(changeLog);
+  text += `## Summary\n`;
+  text += `- Total actions: ${changeLog.length}\n`;
+  text += `- Checkbox toggles: ${summary.checkboxToggles}\n`;
+  text += `- Notes added: ${summary.notesAdded}\n`;
+  text += `- Items skipped: ${summary.itemsSkipped}\n`;
+  text += `- Items edited: ${summary.itemsEdited}\n`;
+  text += `- Mark done actions: ${summary.markDoneActions}\n`;
+  if (summary.timeSpent) {
+    text += `- Time spent: ${summary.timeSpent} seconds (${Math.round(summary.timeSpent / 60)} minutes)\n`;
+  }
+  text += '\n';
+  
+  // Add detailed log
+  text += `## Detailed Log\n\n`;
+  changeLog.forEach((entry, index) => {
+    text += `### ${index + 1}. ${entry.action.replace(/_/g, ' ').toUpperCase()}\n`;
+    text += `**Time:** ${new Date(entry.timestamp).toLocaleString()}\n`;
+    text += `**User:** ${entry.user}\n`;
+    
+    if (entry.details) {
+      text += `**Details:**\n`;
+      Object.entries(entry.details).forEach(([key, value]) => {
+        text += `- ${key}: ${value}\n`;
+      });
+    }
+    text += '\n';
+  });
+  
+  return text;
+}
+
+function generateSummaryFromChangeLog(changeLog) {
+  return {
+    checkboxToggles: changeLog.filter(log => log.action === 'checkbox_toggle').length,
+    notesAdded: changeLog.filter(log => log.action === 'note_added' || log.action === 'done_with_note').length,
+    itemsSkipped: changeLog.filter(log => log.action === 'skip_with_reason').length,
+    itemsEdited: changeLog.filter(log => log.action === 'edit_activity').length,
+    markDoneActions: changeLog.filter(log => log.action === 'mark_done').length,
+    timeSpent: (() => {
+      const fileOpened = changeLog.find(log => log.action === 'file_opened');
+      const lastAction = changeLog[changeLog.length - 1];
+      if (fileOpened && lastAction) {
+        const startTime = new Date(fileOpened.timestamp);
+        const endTime = new Date(lastAction.timestamp);
+        return Math.round((endTime - startTime) / 1000);
+      }
+      return null;
+    })()
+  };
+}
 
 router.get('/files', async (req, res) => {
   try {
@@ -343,11 +421,21 @@ router.delete('/files/:fileName', async (req, res) => {
     const { fileName } = req.params;
     const userId = req.user.userId;
     
+    // Prevent deleting changelog files directly
+    if (fileName.endsWith('.changelog')) {
+      return res.status(403).json({ error: 'Changelog files cannot be deleted directly' });
+    }
+    
     const result = await databaseFileService.deleteFile(userId, fileName);
     
     if (!result.success) {
       return res.status(404).json({ error: result.error });
     }
+    
+    // Also delete the corresponding changelog file if it exists
+    const changeLogFileName = `${fileName}.changelog`;
+    await databaseFileService.deleteFile(userId, changeLogFileName);
+    // Don't check result - it's ok if changelog doesn't exist
     
     res.json({ success: true, message: 'File deleted successfully' });
   } catch (error) {
