@@ -37,5 +37,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Start the application with database migration
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+# Start the application (database setup handled separately)
+CMD ["npm", "start"]
