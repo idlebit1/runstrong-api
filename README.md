@@ -197,6 +197,34 @@ src/
     └── logger.js         # Logging utility
 ```
 
+## Deployment
+
+### Quick Deploy to DigitalOcean Droplet
+
+**🚀 FASTEST METHOD (No Database Bullshit):**
+
+```bash
+# One command deployment
+./scripts/quick-deploy.sh 64.23.176.126
+```
+
+This script:
+- Transfers files efficiently with rsync
+- Sets up production environment
+- Force resets database schema (avoiding migration conflicts)
+- Baselines migrations properly
+- Starts the application
+- Verifies deployment
+
+**🎯 Result:** Application running at http://64.23.176.126:3000
+
+### Other Deployment Options
+
+See [DEPLOY.md](DEPLOY.md) for:
+- DigitalOcean App Platform
+- Manual Docker deployment
+- SSL setup with Let's Encrypt
+
 ## Usage Notes
 
 - User files are stored in `src/data/userFiles/{userId}/`

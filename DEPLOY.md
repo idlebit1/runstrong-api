@@ -1,6 +1,25 @@
 # DigitalOcean Deployment Guide
 
-## Option 1: DigitalOcean App Platform (Recommended)
+## FASTEST OPTION: Quick Deploy Script
+
+**Use this for rapid deployments to avoid database migration bullshit:**
+
+```bash
+# Create the quick deploy script
+./scripts/quick-deploy.sh 64.23.176.126
+```
+
+**What this script does:**
+1. Transfers files with rsync (fast, excludes bloat)
+2. Sets up production environment 
+3. Force resets database schema (avoids migration conflicts)
+4. Baselines migrations properly
+5. Starts application
+6. Verifies deployment
+
+---
+
+## Option 1: DigitalOcean App Platform
 
 ### 1. Prepare Your Repository
 ```bash
@@ -93,23 +112,34 @@ scp -r /Users/reschkek/code/runstrong-api root@your-droplet-ip:/opt/runstrong-ap
 
 Option 3 is fastest since you already have the code locally.
 
+# CRITICAL: Use this sequence to avoid database migration issues
 
 # Create production environment file
-cat > .env << EOF
-NODE_ENV=production
-PORT=3000
-JWT_SECRET=your-secure-jwt-secret-here
-ANTHROPIC_API_KEY=your-anthropic-api-key
-VALID_API_KEYS=your-api-key-1,your-api-key-2
-LOG_LEVEL=info
-EOF
+cp .env.production .env
+
+# IMPORTANT: Force reset database schema (avoids migration conflicts)
+docker-compose up -d postgres
+sleep 10
+
+# Reset and push schema directly (MUCH FASTER than migrations)
+docker run --rm --network runstrong-api_default \
+  -e DATABASE_URL=postgresql://runstrong:runstrong_secure_password_2024@postgres:5432/runstrong_db \
+  -v /opt/runstrong-api:/app -w /app node:18-alpine \
+  sh -c 'npm install && npx prisma db push --force-reset'
+
+# Baseline migrations to prevent startup failures
+docker run --rm --network runstrong-api_default \
+  -e DATABASE_URL=postgresql://runstrong:runstrong_secure_password_2024@postgres:5432/runstrong_db \
+  -v /opt/runstrong-api:/app -w /app node:18-alpine \
+  sh -c 'npx prisma migrate resolve --applied 20250716190000_postgresql_init && \
+         npx prisma migrate resolve --applied 20250716223248_init_user_auth'
 
 # Start the application
 docker-compose up -d
 
 # Check status
 docker-compose ps
-docker-compose logs -f
+docker-compose logs -f runstrong-api --tail=20
 ```
 
 ### 4. Setup Nginx (Optional)

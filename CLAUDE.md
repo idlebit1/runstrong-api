@@ -83,9 +83,36 @@ npm run db:reset
 4. Test interactive features at http://localhost:3000
 
 ### Deployment
+
+#### CRITICAL: Droplet IP Address
+**DROPLET IP: 64.23.176.126**
+
+#### Quick Deploy Command
+```bash
+# Fast deployment to droplet (use this for speed)
+./scripts/quick-deploy.sh 64.23.176.126
+```
+
+#### Deploy Process Details
 - Production uses Docker with PostgreSQL
-- Deploy script: `./deploy-jwt.sh <ip-address>`
 - Environment files: `.env` (local), `.env.production` (prod)
+- Database schema: **ALWAYS use `prisma db push --force-reset` for clean deployments**
+- Migration baseline: **ALWAYS mark migrations as applied after schema push**
+
+#### Deployment Issues Prevention
+**CRITICAL STEPS TO AVOID DATABASE BULLSHIT:**
+1. Use `rsync` to transfer files (exclude node_modules, .git)
+2. Use `prisma db push --force-reset` NOT `prisma migrate deploy`
+3. Mark migrations as applied: `prisma migrate resolve --applied <migration-name>`
+4. Restart containers after DB changes
+
+#### Deployment Checklist
+- [ ] Transfer files with rsync (exclude node_modules)
+- [ ] Copy .env.production to .env
+- [ ] Force reset DB schema with prisma db push
+- [ ] Baseline migrations as applied
+- [ ] Start containers with docker-compose up -d
+- [ ] Verify health endpoint: http://64.23.176.126:3000/health
 
 ## Assistant Guidelines
 
