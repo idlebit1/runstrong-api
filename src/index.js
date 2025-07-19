@@ -30,6 +30,11 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files for demo
 app.use(express.static('public'));
 
+// App route - serve the professional UI
+app.get('/app', (req, res) => {
+  res.sendFile('app.html', { root: 'public' });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
